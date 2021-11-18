@@ -1,0 +1,58 @@
+{
+  "name": "tiny-https-server",
+  "version": "1.0.0",
+  "description": "Easy tiny https web server middleware.",
+  "keywords": [
+    "tiny",
+    "web",
+    "server",
+    "webserver",
+    "http",
+    "https",
+    "static",
+    "subdomain",
+    "middleware",
+    "fast"
+  ],
+  "main": "server.min.js",
+  "license": "MIT",
+  "author": "Manuel Lõhmus <manuel@hauss.ee>",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test.js"
+  },
+  "files": [
+    "cert/localhost-cert.pem",
+    "cert/localhost-key.pem",
+    "log/",
+    "public/test/index.html",
+    "public/www/error_404.html",
+    "public/www/index.html",
+    "config-sets.json",
+    "index.js",
+    "LICENSE",
+    "mimeTypes.js",
+    "package.json",
+    "README.md",
+    "README.html",
+    "server.js",
+    "server.min.js",
+    "test.js"
+  ],
+  "homepage": "https://github.com/manuel-lohmus/tiny-https-server#readme",
+  "bugs": {
+    "url": "https://github.com/manuel-lohmus/tiny-https-server/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/manuel-lohmus/tiny-https-server.git"
+  },
+  "dependencies": {
+    "config-sets": "^2.0.0",
+    "try-to-run": "^1.0.0"
+  },
+  "devDependencies": {
+    "browse-url": "^1.0.0",
+    "log-report": "^1.1.3"
+  }
+}

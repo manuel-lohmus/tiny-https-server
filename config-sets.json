@@ -1,0 +1,23 @@
+{
+  "production": {
+    "tiny_https_server": {
+      "domain": "localhost",
+      "port": 443,
+      "document_root": "./public/www",
+      "directory_index": "index.html",
+      "pathToError_404": "./error_404.html",
+      "pathToPrivkey": "./cert/localhost-key.pem",
+      "pathToCert": "./cert/localhost-cert.pem",
+      "subdomains": {
+        "test": "./public/test"
+      }
+    }
+  },
+  "development": {
+    "tiny_https_server": {
+      "subdomains": {
+        "test": "./public/test"
+      }
+    }
+  }
+}

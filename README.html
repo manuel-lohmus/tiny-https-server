@@ -1,0 +1,103 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>tiny-webs-erver: Easy tiny https web server middleware.</title>
+</head>
+<body>
+
+    <h1 id="tiny-webs-erver-easy-tiny-https-web-server-middleware">tiny-webs-erver: Easy tiny https web server middleware.</h1>
+<p><a href="https://www.npmjs.com/package/tiny-https-server"><img src="https://badgen.net/npm/v/tiny-https-server" alt="npm-version" /></a>
+<a href="https://www.npmjs.com/package/tiny-https-server"><img src="https://badgen.net/npm/dw/tiny-https-server" alt="npm-week-downloads" /></a></p>
+<p>Easy tiny https web server middleware.
+Easy to use and configure.
+Handle subdomains.
+Serving static files.</p>
+<h2 id="installing">Installing</h2>
+<p><code>npm install tiny-https-server</code></p>
+<h2 id="usage-example">Usage example</h2>
+<p>app.js</p>
+<pre><code class="language-js">&quot;use strict&quot;;
+
+if (require(&quot;try-to-run&quot;)()) {
+    // isMainThread
+    require('log-report').clear();
+    return;
+}
+
+console.time(&quot;Time&quot;);
+var options = require(&quot;config-sets&quot;).tiny_https_server;
+options.subdomains = { test: &quot;./public/test&quot; };
+
+var server = require(&quot;tiny-https-server&quot;);
+// Console log
+server.on(&quot;request&quot;, function (req, res, next) {
+    console.timeLog(&quot;Time&quot;, `Url: ${req.headers.host}${req.url}`);
+    next();
+});
+// Test page.
+server.on(&quot;request&quot;, function (req, res, next) {
+    if (req.url === &quot;/test&quot;) {
+        res.writeHead(200, { &quot;Content-Type&quot;: &quot;text/plain&quot; });
+        res.write(&quot;Test page.&quot;);
+        res.end();
+    }
+    else
+        next();
+});
+// Simulated crash ...
+server.on(&quot;request&quot;, function (req, res, next) {
+    if (req.url === &quot;/crash&quot;) {
+        throw new Error(&quot;Simulated crash ...&quot;);
+    }
+    else
+        next();
+});
+
+
+var port = options.port === 443 ? &quot;&quot; : &quot;:&quot; + options.port;
+var urls = [
+    `http://localhost${port}/`,
+    `http://test.localhost${port}/`,
+    `http://localhost${port}/test`,
+    `http://test.localhost${port}/test`,
+    `http://localhost${port}/home`
+];
+
+// Opens the URLs in the default browser.
+while (urls.length) {
+    require(&quot;browse-url&quot;)(urls.shift());
+}
+</code></pre>
+<h2 id="config-sets-file">Config-sets file</h2>
+<p>config-sets.json</p>
+<pre><code class="language-json">{
+  &quot;production&quot;: {
+    &quot;tiny_https_server&quot;: {
+      &quot;domain&quot;: &quot;localhost&quot;,
+      &quot;port&quot;: 443,
+      &quot;document_root&quot;: &quot;./public/www&quot;,
+      &quot;directory_index&quot;: &quot;index.html&quot;,
+      &quot;pathToError_404&quot;: &quot;./error_404.html&quot;,
+      &quot;pathToPrivkey&quot;: &quot;./cert/localhost-key.pem&quot;,
+      &quot;pathToCert&quot;: &quot;./cert/localhost-cert.pem&quot;,
+      &quot;subdomains&quot;: {
+        &quot;test&quot;: &quot;./public/test&quot;
+      }
+    }
+  },
+  &quot;development&quot;: {
+    &quot;tiny_https_server&quot;: {
+      &quot;subdomains&quot;: {
+        &quot;test&quot;: &quot;./public/test&quot;
+      }
+    }
+  }
+}
+</code></pre>
+<h2 id="license">License</h2>
+<p><a href="LICENSE">MIT</a></p>
+<p>Copyright (c) 2021 Manuel Lõhmus <a href="mailto:manuel@hauss.ee">manuel@hauss.ee</a></p>
+
+
+</body>
+</html>
