@@ -5,6 +5,7 @@ var options = require("config-sets").init({
     tiny_https_server: {
         domain: "localhost",
         port: "",
+        logDir: "./log/tiny-https-server",
         document_root: "./public/www",
         directory_index: "index.html",
         pathToError_404: "./error_404.html",
@@ -21,7 +22,9 @@ var port = options.port || (isSSL ? 443 : 80);
 var path = require("path");
 var fs = require("fs");
 var mimeTypes = require(path.resolve(__dirname, "mimeTypes.js"));
+var logDir = path.resolve(__dirname, options.logDir);
 
+if (!fs.existsSync(logDir)) { fs.mkdirSync(logDir, { recursive: true }); }
 
 if (isSSL && port === 443) {
 
@@ -44,12 +47,33 @@ var server = isSSL && port !== 80
     })
     : http.createServer();
 
+function log(res) {
+
+    var date = new Date();
+    var fileName = path.resolve(__dirname, options.logDir, date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate() + ".log")
+    var msg = res.req.client.remoteAddress + " ";
+    msg += "[" + date.toLocaleString() + "] ";
+    msg += '"' + res.req.headers.host + " " + res.req.method + " " + res.req.url + " HTTP/" + res.req.httpVersion + '" ';
+    msg += res.statusCode + " ";
+    msg += res.req.client.remotePort + " ";
+    msg += '"' + res.req.headers["user-agent"] + '"\r\n';
+
+    fs.appendFile(
+        fileName,
+        msg,
+        { flag: 'a+' },
+        function (err) { if (err) { console.error(err); } }
+    );
+}
+
 var emit = server.emit;
 server.emit = function () {
 
     var args = arguments;
 
     if (args[0] === "request") {
+
+        args[2].on('finish', function () { log(this); });
 
         var requestArr = [];
 
@@ -104,12 +128,12 @@ function static_reqest(req, res) {
     if (subdomain.endsWith(".")) { subdomain = subdomain.substr(0, subdomain.length - 1); }
     var document_root = subdomain === "" ? options.document_root : options.subdomains[subdomain];
 
-    if (document_root) {
+    if (document_root && req.method.toLocaleUpperCase() === "GET") {
 
-        filename = path.resolve(document_root, filename);
+        filename = path.resolve(__dirname, document_root, filename);
         static_file(filename, res, function () {
 
-            filename = path.resolve(options.document_root, options.pathToError_404);
+            filename = path.resolve(__dirname, options.document_root, options.pathToError_404);
             static_file(filename, res, function (exists) {
 
                 if (!exists) {
@@ -134,9 +158,10 @@ function static_file(filename, res, fn_not_found) {
 
         if (exists) {
 
+            var statusCode = filename.endsWith(path.parse(options.pathToError_404).base) ? 404 : 200;
             var mimeType = mimeTypes[path.extname(filename)];
             if (!mimeType) mimeType = "";
-            res.writeHead(200, { "Content-Type": mimeType });
+            res.writeHead(statusCode, { "Content-Type": mimeType });
             fs.createReadStream(filename).pipe(res);
         }
         else

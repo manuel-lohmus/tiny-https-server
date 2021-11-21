@@ -3,6 +3,7 @@
     "tiny_https_server": {
       "domain": "localhost",
       "port": 443,
+      "logDir": "./log/tiny-https-server",
       "document_root": "./public/www",
       "directory_index": "index.html",
       "pathToError_404": "./error_404.html",
@@ -11,6 +12,10 @@
       "subdomains": {
         "test": "./public/test"
       }
+    },
+    "log_report": {
+      "logDir": "./log/log-report",
+      "enabled": true
     }
   },
   "development": {

@@ -35,9 +35,6 @@
     <Content Include="config-sets.json" />
     <Content Include="index.js" />
     <Content Include="LICENSE" />
-    <Content Include="log\error.log" />
-    <Content Include="log\stderr.log" />
-    <Content Include="log\stdout.log" />
     <Content Include="mimeTypes.js" />
     <Content Include="package.json" />
     <Content Include="public\test\index.html" />
@@ -54,6 +51,8 @@
   <ItemGroup>
     <Folder Include="cert\" />
     <Folder Include="log\" />
+    <Folder Include="log\log-report\" />
+    <Folder Include="log\tiny-https-server\" />
     <Folder Include="public\" />
     <Folder Include="public\test\" />
     <Folder Include="public\www\" />
