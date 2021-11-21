@@ -1,4 +1,4 @@
-# tiny-webs-erver: Easy tiny https web server middleware.
+# tiny-https-server: Easy tiny https web server middleware.
 
 [![npm-version](https://badgen.net/npm/v/tiny-https-server)](https://www.npmjs.com/package/tiny-https-server)
 [![npm-week-downloads](https://badgen.net/npm/dw/tiny-https-server)](https://www.npmjs.com/package/tiny-https-server)

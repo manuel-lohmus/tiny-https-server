@@ -1,6 +1,6 @@
 {
   "name": "tiny-https-server",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Easy tiny https web server middleware.",
   "keywords": [
     "tiny",
