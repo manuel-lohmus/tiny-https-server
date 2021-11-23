@@ -16,11 +16,10 @@ Serving static files.
 
 app.js
 ```js
-"use strict";
+require('log-report');
 
 if (require("try-to-run")()) {
     // isMainThread
-    require('log-report').clear();
     return;
 }
 
@@ -29,6 +28,8 @@ var options = require("config-sets").tiny_https_server;
 options.subdomains = { test: "./public/test" };
 
 var server = require("tiny-https-server");
+//var server = require("./server.min.js");
+
 // Console log
 server.on("request", function (req, res, next) {
     console.timeLog("Time", `Url: ${req.headers.host}${req.url}`);
@@ -78,6 +79,7 @@ config-sets.json
     "tiny_https_server": {
       "domain": "localhost",
       "port": 443,
+      "logDir": "./log/tiny-https-server",
       "document_root": "./public/www",
       "directory_index": "index.html",
       "pathToError_404": "./error_404.html",
@@ -86,6 +88,16 @@ config-sets.json
       "subdomains": {
         "test": "./public/test"
       }
+    },
+    "log_report": {
+      "logDir": "./log/log-report",
+      "enabled": true,
+      "clear_on_startup": false,
+      "save_only_uncaughtException": true
+    },
+    "browse_url": {
+      "launch_url": "",
+      "enabled": false
     }
   },
   "development": {
@@ -93,6 +105,16 @@ config-sets.json
       "subdomains": {
         "test": "./public/test"
       }
+    },
+    "log_report": {
+      "logDir": "./log/log-report",
+      "enabled": true,
+      "clear_on_startup": true,
+      "save_only_uncaughtException": false
+    },
+    "browse_url": {
+      "launch_url": "http://localhost:1337/",
+      "enabled": true
     }
   }
 }

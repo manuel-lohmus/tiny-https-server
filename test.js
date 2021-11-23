@@ -1,8 +1,9 @@
 "use strict";
 
+require('log-report');
+
 if (require("try-to-run")()) {
     // isMainThread
-    require('log-report').clear();
     return;
 }
 

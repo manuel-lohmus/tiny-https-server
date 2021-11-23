@@ -16,11 +16,10 @@ Serving static files.</p>
 <p><code>npm install tiny-https-server</code></p>
 <h2 id="usage-example">Usage example</h2>
 <p>app.js</p>
-<pre><code class="language-js">&quot;use strict&quot;;
+<pre><code class="language-js">require('log-report');
 
 if (require(&quot;try-to-run&quot;)()) {
     // isMainThread
-    require('log-report').clear();
     return;
 }
 
@@ -29,6 +28,8 @@ var options = require(&quot;config-sets&quot;).tiny_https_server;
 options.subdomains = { test: &quot;./public/test&quot; };
 
 var server = require(&quot;tiny-https-server&quot;);
+//var server = require(&quot;./server.min.js&quot;);
+
 // Console log
 server.on(&quot;request&quot;, function (req, res, next) {
     console.timeLog(&quot;Time&quot;, `Url: ${req.headers.host}${req.url}`);
@@ -75,6 +76,7 @@ while (urls.length) {
     &quot;tiny_https_server&quot;: {
       &quot;domain&quot;: &quot;localhost&quot;,
       &quot;port&quot;: 443,
+      &quot;logDir&quot;: &quot;./log/tiny-https-server&quot;,
       &quot;document_root&quot;: &quot;./public/www&quot;,
       &quot;directory_index&quot;: &quot;index.html&quot;,
       &quot;pathToError_404&quot;: &quot;./error_404.html&quot;,
@@ -83,6 +85,16 @@ while (urls.length) {
       &quot;subdomains&quot;: {
         &quot;test&quot;: &quot;./public/test&quot;
       }
+    },
+    &quot;log_report&quot;: {
+      &quot;logDir&quot;: &quot;./log/log-report&quot;,
+      &quot;enabled&quot;: true,
+      &quot;clear_on_startup&quot;: false,
+      &quot;save_only_uncaughtException&quot;: true
+    },
+    &quot;browse_url&quot;: {
+      &quot;launch_url&quot;: &quot;&quot;,
+      &quot;enabled&quot;: false
     }
   },
   &quot;development&quot;: {
@@ -90,6 +102,16 @@ while (urls.length) {
       &quot;subdomains&quot;: {
         &quot;test&quot;: &quot;./public/test&quot;
       }
+    },
+    &quot;log_report&quot;: {
+      &quot;logDir&quot;: &quot;./log/log-report&quot;,
+      &quot;enabled&quot;: true,
+      &quot;clear_on_startup&quot;: true,
+      &quot;save_only_uncaughtException&quot;: false
+    },
+    &quot;browse_url&quot;: {
+      &quot;launch_url&quot;: &quot;http://localhost:1337/&quot;,
+      &quot;enabled&quot;: true
     }
   }
 }

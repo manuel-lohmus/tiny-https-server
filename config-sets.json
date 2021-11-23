@@ -15,7 +15,13 @@
     },
     "log_report": {
       "logDir": "./log/log-report",
-      "enabled": true
+      "enabled": true,
+      "clear_on_startup": false,
+      "save_only_uncaughtException": true
+    },
+    "browse_url": {
+      "launch_url": "",
+      "enabled": false
     }
   },
   "development": {
@@ -23,6 +29,16 @@
       "subdomains": {
         "test": "./public/test"
       }
+    },
+    "log_report": {
+      "logDir": "./log/log-report",
+      "enabled": true,
+      "clear_on_startup": true,
+      "save_only_uncaughtException": false
+    },
+    "browse_url": {
+      "launch_url": "http://localhost:1337/",
+      "enabled": true
     }
   }
 }
