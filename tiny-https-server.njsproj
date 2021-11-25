@@ -30,6 +30,7 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="bundleconfig.json" />
+    <Content Include="browser.js" />
     <Content Include="cert\localhost-cert.pem" />
     <Content Include="cert\localhost-key.pem" />
     <Content Include="config-sets.json" />

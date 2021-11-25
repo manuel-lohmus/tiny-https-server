@@ -1,6 +1,6 @@
 {
   "name": "tiny-https-server",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Easy tiny https web server middleware.",
   "keywords": [
     "tiny",
@@ -15,6 +15,7 @@
     "fast"
   ],
   "main": "server.min.js",
+  "browser": "browser.js",
   "license": "MIT",
   "author": "Manuel Lõhmus <manuel@hauss.ee>",
   "scripts": {
@@ -28,6 +29,7 @@
     "public/test/index.html",
     "public/www/error_404.html",
     "public/www/index.html",
+    "browser.js",
     "config-sets.json",
     "index.js",
     "LICENSE",

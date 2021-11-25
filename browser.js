@@ -1,0 +1,1 @@
+throw new Error("'tiny-https-server' does not work in the browser.");
