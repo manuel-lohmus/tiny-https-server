@@ -22,6 +22,10 @@
     "browse_url": {
       "launch_url": "",
       "enabled": false
+    },
+    "try_to_run": {
+      "retrying": 10,
+      "enabled": true
     }
   },
   "development": {

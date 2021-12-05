@@ -22,7 +22,7 @@ var port = options.port || (isSSL ? 443 : 80);
 var path = require("path");
 var fs = require("fs");
 var mimeTypes = require(path.resolve(__dirname, "mimeTypes.js"));
-var logDir = path.resolve(__dirname, options.logDir);
+var logDir = path.resolve(process.cwd(), options.logDir);
 
 if (!fs.existsSync(logDir)) { fs.mkdirSync(logDir, { recursive: true }); }
 
@@ -34,7 +34,7 @@ if (isSSL && port === 443) {
             static_reqest(req, res)
         else {
             // redirect http to https
-            res.writeHead(302, { "Location": "https://" + req.headers["host"] + req.url }); 
+            res.writeHead(302, { "Location": "https://" + req.headers["host"] + req.url });
             res.end();
         }
     }).listen(80);
@@ -130,10 +130,10 @@ function static_reqest(req, res) {
 
     if (document_root && req.method.toLocaleUpperCase() === "GET") {
 
-        filename = path.resolve(__dirname, document_root, filename);
+        filename = path.resolve(process.cwd(), document_root, filename);
         static_file(filename, res, function () {
 
-            filename = path.resolve(__dirname, options.document_root, options.pathToError_404);
+            filename = path.resolve(process.cwd(), options.document_root, options.pathToError_404);
             static_file(filename, res, function (exists) {
 
                 if (!exists) {
