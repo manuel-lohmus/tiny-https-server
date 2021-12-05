@@ -15,12 +15,18 @@ var options = require("config-sets").init({
     }
 }).tiny_https_server;
 
+var fs = require("fs");
+var path = require("path");
+
+if (options.domain === "localhost") {
+    options.pathToPrivkey = path.resolve(__dirname, "./cert/localhost-key.pem");
+    options.pathToCert = path.resolve(__dirname, "./cert/localhost-cert.pem");
+}
+
 var http = require("http");
 var https = require("https");
 var isSSL = options.pathToPrivkey !== "" && options.pathToCert !== "";
 var port = options.port || (isSSL ? 443 : 80);
-var path = require("path");
-var fs = require("fs");
 var mimeTypes = require(path.resolve(__dirname, "mimeTypes.js"));
 var logDir = path.resolve(process.cwd(), options.logDir);
 
@@ -50,7 +56,7 @@ var server = isSSL && port !== 80
 function log(res) {
 
     var date = new Date();
-    var fileName = path.resolve(__dirname, options.logDir, date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate() + ".log")
+    var fileName = path.resolve(process.cwd(), options.logDir, date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate() + ".log")
     var msg = res.req.client.remoteAddress + " ";
     msg += "[" + date.toLocaleString() + "] ";
     msg += '"' + res.req.headers.host + " " + res.req.method + " " + res.req.url + " HTTP/" + res.req.httpVersion + '" ';
