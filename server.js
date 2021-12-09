@@ -1,4 +1,4 @@
-/** Web server functions. @preserve Copyright (c) 2021 Manuel Lõhmus. */
+/** Web server functions. @preserve Copyright (c) 2021 Manuel LÃµhmus. */
 "use strict";
 
 var options = require("config-sets").init({
@@ -53,16 +53,16 @@ var server = isSSL && port !== 80
     })
     : http.createServer();
 
-function log(res) {
+function log(req, res) {
 
     var date = new Date();
     var fileName = path.resolve(process.cwd(), options.logDir, date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate() + ".log")
-    var msg = res.req.client.remoteAddress + " ";
+    var msg = req.client.remoteAddress + " ";
     msg += "[" + date.toLocaleString() + "] ";
-    msg += '"' + res.req.headers.host + " " + res.req.method + " " + res.req.url + " HTTP/" + res.req.httpVersion + '" ';
+    msg += '"' + req.headers.host + " " + req.method + " " + req.url + " HTTP/" + req.httpVersion + '" ';
     msg += res.statusCode + " ";
-    msg += res.req.client.remotePort + " ";
-    msg += '"' + res.req.headers["user-agent"] + '"\r\n';
+    msg += req.client.remotePort + " ";
+    msg += '"' + req.headers["user-agent"] + '"\r\n';
 
     fs.appendFile(
         fileName,
@@ -79,7 +79,7 @@ server.emit = function () {
 
     if (args[0] === "request") {
 
-        args[2].on('finish', function () { log(this); });
+        args[2].on('finish', function () { log(args[1], args[2]); });
 
         var requestArr = [];
 
@@ -97,7 +97,7 @@ server.emit = function () {
             if (requestArr.length) {
 
                 var fnRequest = requestArr.shift();
-                fnRequest(args[1], args[2], next);
+                setTimeout(function () { fnRequest(args[1], args[2], next); });
             }
         }
 
