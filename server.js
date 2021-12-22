@@ -90,6 +90,7 @@ server.emit = function () {
                 requestArr = requestArr.concat(server._events.request);
         }
 
+        requestArr.push(node_modules_reqest);
         requestArr.push(static_reqest);
 
         function next() {
@@ -118,6 +119,42 @@ server.listen(port, function (err) {
         console.log("Webserver port:" + port + " pid:" + process.pid);
 });
 
+/**
+ * @param {http.IncomingMessage} req
+ * @param {http.ServerResponse} res
+ */
+function node_modules_reqest(req, res, next) {
+
+    if (req.url.startsWith("/node_modules") && req.method.toLocaleUpperCase() === "GET") {
+
+        var filename = "";
+        var arrPath = req.url.split("/").filter(function (v) { return v; });
+
+        if (arrPath.length === 2) {
+
+            var pk = require(arrPath[1] + "/package.json");
+            filename = path.resolve(process.cwd(), arrPath.join("/"), pk.browser || pk.main);
+        }
+        else {
+
+            filename = path.resolve(process.cwd(), arrPath.join("/"));
+        }
+
+        static_file(filename, res, function () {
+
+            filename = path.resolve(process.cwd(), options.document_root, options.pathToError_404);
+            static_file(filename, res, function (exists) {
+
+                if (!exists) {
+
+                    not_found_content(req, res);
+                }
+            })
+        });
+    }
+    else
+        next();
+}
 /**
  * @param {http.IncomingMessage} req
  * @param {http.ServerResponse} res
