@@ -1,7 +1,8 @@
 /** Web server functions. @preserve Copyright (c) 2021 Manuel Lõhmus. */
 "use strict";
 
-var options = require("config-sets").init({
+var cs = require("config-sets");
+var options = cs.init({
     tiny_https_server: {
         domain: "localhost",
         port: "",
@@ -18,14 +19,14 @@ var options = require("config-sets").init({
 var fs = require("fs");
 var path = require("path");
 
-if (options.domain === "localhost") {
+var isSSL = options.pathToPrivkey !== "" && options.pathToCert !== "";
+if (!isSSL && options.domain === "localhost") {
     options.pathToPrivkey = path.resolve(__dirname, "./cert/localhost-key.pem");
     options.pathToCert = path.resolve(__dirname, "./cert/localhost-cert.pem");
 }
 
 var http = require("http");
 var https = require("https");
-var isSSL = options.pathToPrivkey !== "" && options.pathToCert !== "";
 var port = options.port || (isSSL ? 443 : 80);
 var mimeTypes = require(path.resolve(__dirname, "mimeTypes.js"));
 var logDir = path.resolve(process.cwd(), options.logDir);
@@ -130,7 +131,7 @@ function node_modules_reqest(req, res, next) {
         var filename = "";
         var arrPath = req.url.split("/").filter(function (v) { return v; });
 
-        if (arrPath.length === 2) {
+        if (arrPath.length === 2 && fs.existsSync(path.resolve(process.cwd(), arrPath.join("/")))) {
 
             var pk = require(arrPath[1] + "/package.json");
             filename = path.resolve(process.cwd(), arrPath.join("/"), pk.browser || pk.main);
@@ -161,7 +162,7 @@ function node_modules_reqest(req, res, next) {
  */
 function static_reqest(req, res) {
 
-    var filename = req.url;
+    var filename = req.url.split("?").shift();
 
     if (!filename.length || filename.endsWith("/")) { filename += options.directory_index; }
     if (filename.startsWith("/")) { filename = filename.substr(1); }
@@ -217,11 +218,13 @@ function static_file(filename, res, fn_not_found) {
  */
 function not_found_content(req, res) {
 
-    console.info("Warning: 404 Not Found", {
-        url: req.url,
-        ip: req.socket.remoteAddress,
-        userAgent: req.headers["user-agent"]
-    });
+    if (cs.isDebug) {
+        console.info("Warning: 404 Not Found", {
+            url: req.url,
+            ip: req.socket.remoteAddress,
+            userAgent: req.headers["user-agent"]
+        });
+    }
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.write("404 Not Found Url: " + req.url + "\n");
     if (options.isDebug) {
@@ -231,3 +234,4 @@ function not_found_content(req, res) {
 }
 
 module.exports = server;
+server.options = options;
