@@ -9,10 +9,10 @@ if (require("try-to-run")()) {
 
 console.time("Time");
 var options = require("config-sets").tiny_https_server;
-options.subdomains = { test: "./public/test" };
+options.subdomains = { test: { document_root: "./public/test" } };
 
 //var server = require("tiny-https-server");
-var server = require("./server.min.js");
+var server = require("./server.js");
 // Console log
 server.on("request", function (req, res, next) {
     console.timeLog("Time", `Url: ${req.headers.host}${req.url}`);
@@ -36,7 +36,6 @@ server.on("request", function (req, res, next) {
     else
         next();
 });
-
 
 var port = options.port === 443 ? "" : ":" + options.port;
 var urls = [

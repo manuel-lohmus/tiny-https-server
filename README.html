@@ -7,6 +7,7 @@
 
     <h1 id="tiny-https-server-easy-tiny-https-web-server-middleware">tiny-https-server: Easy tiny https web server middleware.</h1>
 <p><a href="https://www.npmjs.com/package/tiny-https-server"><img src="https://badgen.net/npm/v/tiny-https-server" alt="npm-version" /></a>
+<a href="https://www.npmjs.com/package/tiny-https-server"><img src="https://badgen.net/npm/dt/tiny-https-server" alt="npm-total-downloads" /></a>
 <a href="https://www.npmjs.com/package/tiny-https-server"><img src="https://badgen.net/npm/dw/tiny-https-server" alt="npm-week-downloads" /></a></p>
 <p>Easy tiny https web server middleware.
 Easy to use and configure.
@@ -83,7 +84,29 @@ while (urls.length) {
       &quot;pathToPrivkey&quot;: &quot;./cert/localhost-key.pem&quot;,
       &quot;pathToCert&quot;: &quot;./cert/localhost-cert.pem&quot;,
       &quot;subdomains&quot;: {
-        &quot;test&quot;: &quot;./public/test&quot;
+        &quot;test&quot;: {
+          &quot;document_root&quot;: &quot;./public/test&quot;
+        }
+      },
+      &quot;cacheControl&quot;: {
+        &quot;fileTypes&quot;: {
+          &quot;bmp&quot;: &quot;max-age=2592000&quot;,
+          &quot;jpeg&quot;: &quot;max-age=2592000&quot;,
+          &quot;jpg&quot;: &quot;max-age=2592000&quot;,
+          &quot;png&quot;: &quot;max-age=2592000&quot;,
+          &quot;svg&quot;: &quot;max-age=2592000&quot;,
+          &quot;pdf&quot;: &quot;max-age=2592000&quot;,
+          &quot;html&quot;: &quot;max-age=86400&quot;,
+          &quot;css&quot;: &quot;max-age=86400&quot;,
+          &quot;js&quot;: &quot;max-age=86400&quot;,
+          &quot;webp&quot;: &quot;max-age=2592000&quot;
+        }
+      },
+      &quot;setHeaders&quot;: {
+        &quot;default&quot;: {},
+        &quot;/&quot;: {
+          &quot;X-Frame-Options&quot;: &quot;DENY&quot;
+        }
       }
     },
     &quot;log_report&quot;: {
@@ -95,6 +118,10 @@ while (urls.length) {
     &quot;browse_url&quot;: {
       &quot;launch_url&quot;: &quot;&quot;,
       &quot;enabled&quot;: false
+    },
+    &quot;try_to_run&quot;: {
+      &quot;retrying&quot;: 10,
+      &quot;enabled&quot;: true
     }
   },
   &quot;development&quot;: {
@@ -110,7 +137,7 @@ while (urls.length) {
       &quot;save_only_uncaughtException&quot;: false
     },
     &quot;browse_url&quot;: {
-      &quot;launch_url&quot;: &quot;http://localhost:1337/&quot;,
+      &quot;launch_url&quot;: &quot;https://localhost/&quot;,
       &quot;enabled&quot;: true
     }
   }

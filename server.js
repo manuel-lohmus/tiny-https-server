@@ -1,39 +1,66 @@
 /** Web server functions. @preserve Copyright (c) 2021 Manuel Lõhmus. */
 "use strict";
-
 var cs = require("config-sets");
 var options = cs.init({
     tiny_https_server: {
         domain: "localhost",
-        port: "",
+        port: 80,
         logDir: "./log/tiny-https-server",
         document_root: "./public/www",
         directory_index: "index.html",
         pathToError_404: "./error_404.html",
         pathToPrivkey: "",
         pathToCert: "",
-        subdomains: {}
+        subdomains: {},
+        cacheControl: {
+            fileTypes: {
+                webp: "max-age=2592000", //30 days
+                bmp: "max-age=2592000", //30 days
+                jpeg: "max-age=2592000", //30 days
+                jpg: "max-age=2592000", //30 days
+                png: "max-age=2592000", //30 days
+                svg: "max-age=2592000", //30 days
+                pdf: "max-age=2592000", //30 days
+
+                html: "max-age=86400", //1 days
+                css: "max-age=86400", //1 days
+                js: "max-age=86400", //1 days
+            }
+        },
+        setHeaders: {
+            default: {},
+            "/": { "X-Frame-Options": "DENY" }
+        }
     }
 }).tiny_https_server;
 
 var fs = require("fs");
 var path = require("path");
+var zlib = require('zlib');
+var { pipeline } = require('stream');
 
-var isSSL = options.pathToPrivkey !== "" && options.pathToCert !== "";
-if (!isSSL && options.domain === "localhost") {
-    options.pathToPrivkey = path.resolve(__dirname, "./cert/localhost-key.pem");
-    options.pathToCert = path.resolve(__dirname, "./cert/localhost-cert.pem");
-}
+var localIP = '127.0.0.1';
+require('dns').lookup(require('os').hostname(), { family: 4 }, function (err, address, family) {
+    if (!err) { localIP = address; }
+})
 
 var http = require("http");
 var https = require("https");
-var port = options.port || (isSSL ? 443 : 80);
+var isSSL = options.port === 80 ? false : options.pathToPrivkey !== "" && options.pathToCert !== "";
 var mimeTypes = require(path.resolve(__dirname, "mimeTypes.js"));
 var logDir = path.resolve(process.cwd(), options.logDir);
 
 if (!fs.existsSync(logDir)) { fs.mkdirSync(logDir, { recursive: true }); }
 
-if (isSSL && port === 443) {
+if (!isSSL && options.domain === "localhost" && (!options.port || options.port === 443)) {
+    options.pathToPrivkey = path.resolve(__dirname, "./cert/localhost-key.pem");
+    options.pathToCert = path.resolve(__dirname, "./cert/localhost-cert.pem");
+    isSSL = true;
+}
+
+if (isSSL) {
+
+    if (!options.port) { options.port = 443; }
 
     http.createServer(function (req, res) {
         if (req.url.startsWith("/."))
@@ -47,21 +74,68 @@ if (isSSL && port === 443) {
     }).listen(80);
 }
 
-var server = isSSL && port !== 80
-    ? https.createServer({
-        key: fs.readFileSync(options.pathToPrivkey),
-        cert: fs.readFileSync(options.pathToCert)
-    })
+var server = isSSL
+    ? https.createServer({ key: fs.readFileSync(options.pathToPrivkey), cert: fs.readFileSync(options.pathToCert) })
     : http.createServer();
+
+var requestArr = [node_modules_reqest, static_reqest];
+server.on("newListener", function (event, listener) {
+
+    if (event === "request") {
+        requestArr.splice(requestArr.length - 2, 0, listener);
+    }
+});
+var emit = server.emit;
+server.emit = function (eventName, req, res) {
+
+
+    if (eventName === "request") {
+
+        setImmediate(function () {
+
+            req.iterator = requestArr.entries();
+            res.on('close', function () {
+                req.iterator = undefined;
+                //delete req.iterator;
+                delete res.fnRequest;
+                log(req, res);
+            });
+
+            function next() {
+
+                res.fnRequest = req.iterator.next().value[1];
+
+                if (typeof res.fnRequest === "function") {
+
+                    res.fnRequest(req, res, next);
+                }
+            }
+
+            next();
+        });
+    }
+    else
+        emit.apply(server, arguments);
+};
+
+//server.on("request", function (req, res, next) { next(); });
+
+server.listen(options.port, function (err) {
+
+    if (err)
+        console.error(err);
+    else
+        console.log("Webserver port:" + options.port + " pid:" + process.pid);
+});
 
 function log(req, res) {
 
     var date = new Date();
-    var fileName = path.resolve(process.cwd(), options.logDir, date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate() + ".log")
+    var fileName = path.resolve(process.cwd(), options.logDir, date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate() + ".log");
     var msg = req.client.remoteAddress + " ";
-    msg += "[" + date.toLocaleString() + "] ";
-    msg += '"' + req.headers.host + " " + req.method + " " + req.url + " HTTP/" + req.httpVersion + '" ';
+    msg += "[" + date.toISOString() + "] ";
     msg += res.statusCode + " ";
+    msg += '"' + req.headers.host + " " + req.method + " " + req.url + " HTTP/" + req.httpVersion + '" ';
     msg += req.client.remotePort + " ";
     msg += '"' + req.headers["user-agent"] + '"\r\n';
 
@@ -73,53 +147,6 @@ function log(req, res) {
     );
 }
 
-var emit = server.emit;
-server.emit = function () {
-
-    var args = arguments;
-
-    if (args[0] === "request") {
-
-        args[2].on('finish', function () { log(args[1], args[2]); });
-
-        var requestArr = [];
-
-        if (server._events.request) {
-            if (typeof server._events.request === "function")
-                requestArr.push(server._events.request);
-            else
-                requestArr = requestArr.concat(server._events.request);
-        }
-
-        requestArr.push(node_modules_reqest);
-        requestArr.push(static_reqest);
-
-        function next() {
-
-            if (requestArr.length) {
-
-                var fnRequest = requestArr.shift();
-                setTimeout(function () { fnRequest(args[1], args[2], next); });
-            }
-        }
-
-        next();
-    }
-    else
-        emit.apply(server, args);
-};
-
-//server.on("request", function (req, res, next) { next(); });
-//server.on("request", function (req, res) { static_reqest(req, res); });
-
-server.listen(port, function (err) {
-
-    if (err)
-        console.error(err)
-    else
-        console.log("Webserver port:" + port + " pid:" + process.pid);
-});
-
 /**
  * @param {http.IncomingMessage} req
  * @param {http.ServerResponse} res
@@ -129,16 +156,18 @@ function node_modules_reqest(req, res, next) {
     if (req.url.startsWith("/node_modules") && req.method.toLocaleUpperCase() === "GET") {
 
         var filename = "";
-        var arrPath = req.url.split("/").filter(function (v) { return v; });
+        var validatePath = isValidatePath(req.url);
+        if (!validatePath) { not_found_content(req, res); return; }
+        var arrPath = validatePath.split("/").filter(function (v) { return v; });
 
         if (arrPath.length === 2 && fs.existsSync(path.resolve(process.cwd(), arrPath.join("/")))) {
 
             var pk = require(arrPath[1] + "/package.json");
-            filename = path.resolve(process.cwd(), arrPath.join("/"), pk.browser || pk.main);
+            filename = path.join(process.cwd(), arrPath.join("/"), pk.browser || pk.main);
         }
         else {
 
-            filename = path.resolve(process.cwd(), arrPath.join("/"));
+            filename = path.join(process.cwd(), arrPath.join("/"));
         }
 
         static_file(filename, res, function () {
@@ -162,19 +191,48 @@ function node_modules_reqest(req, res, next) {
  */
 function static_reqest(req, res) {
 
-    var filename = req.url.split("?").shift();
+    var validatePath = isValidatePath(req.url);
+    if (!validatePath) { not_found_content(req, res); return; }
+    var filename = validatePath.split("?").shift();
 
-    if (!filename.length || filename.endsWith("/")) { filename += options.directory_index; }
-    if (filename.startsWith("/")) { filename = filename.substr(1); }
+    if (!filename.length || filename.endsWith("\\")) { filename += options.directory_index; }
+    if (filename.startsWith("\\")) { filename = filename.substr(1); }
 
-    var subdomain = req.headers.host.replace(":" + options.port, "");
-    subdomain = subdomain.replace(options.domain, "");
-    if (subdomain.endsWith(".")) { subdomain = subdomain.substr(0, subdomain.length - 1); }
-    var document_root = subdomain === "" ? options.document_root : options.subdomains[subdomain];
+    var host = req.headers.host;
+    var document_root = "";
 
-    if (document_root && req.method.toLocaleUpperCase() === "GET") {
+    // Excellent Default Domain
+    if (host === options.domain) {
+        document_root = options.document_root;
+    }
+    // Excellent
+    else if (options.subdomains[host]) {
+        document_root = options.subdomains[host].document_root;
+    }
+    else {
+        var objHost = parseHost(host);
 
-        filename = path.resolve(process.cwd(), document_root, filename);
+        // Default Domain
+        if (!objHost.subdomains.length && (objHost.domain === options.domain || objHost.domain === localIP)) {
+            document_root = options.document_root;
+            host = objHost.domain;
+        }
+        // Virtual Domain
+        else if (options.subdomains[objHost.hostname]) {
+            document_root = options.subdomains[objHost.hostname].document_root;
+            host = objHost.hostname;
+        }
+        // Subdomain
+        else if (options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]]) {
+            document_root = options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]].document_root;
+            host = objHost.subdomains[objHost.subdomains.length - 1];
+        }
+    }
+
+    if (document_root && (req.method.toLocaleUpperCase() === "GET" || req.method.toLocaleUpperCase() === "HEAD")) {
+
+        filename = path.join(process.cwd(), document_root, filename);
+
         static_file(filename, res, function () {
 
             filename = path.resolve(process.cwd(), options.document_root, options.pathToError_404);
@@ -185,7 +243,7 @@ function static_reqest(req, res) {
                     not_found_content(req, res);
                 }
             })
-        });
+        }, host);
     }
     else {
         not_found_content(req, res);
@@ -196,19 +254,80 @@ function static_reqest(req, res) {
  * @param {http.ServerResponse} res
  * @param {()void} callback
  */
-function static_file(filename, res, fn_not_found) {
+function static_file(filename, res, fn_not_found, subdomain) {
 
-    fs.exists(filename, function (exists) {
-
-        if (exists) {
-
-            var statusCode = filename.endsWith(path.parse(options.pathToError_404).base) ? 404 : 200;
-            var mimeType = mimeTypes[path.extname(filename)];
-            if (!mimeType) mimeType = "";
-            res.writeHead(statusCode, { "Content-Type": mimeType });
-            fs.createReadStream(filename).pipe(res);
+    function onError(err) {
+        if (err) {
+            // If an error occurs, there's not much we can do because
+            // the server has already sent the 200 response code and
+            // some amount of data has already been sent to the client.
+            // The best we can do is terminate the response immediately
+            // and log the error.
+            res.end();
+            console.error('An error occurred:', err);
         }
-        else
+    }
+
+    fs.stat(filename, function (err, stats) {
+
+        if (stats) {
+
+            var url = res.req.url;
+            var statusCode = filename.endsWith(path.parse(options.pathToError_404).base) ? 404 : 200;
+            var acceptEncoding = res.req.headers['accept-encoding'] || "";
+            var cacheControl = options.cacheControl.fileTypes[path.extname(filename).substr(1)];
+            var raw = fs.createReadStream(filename);
+            var headers = res.headers || {};
+
+            if (options.subdomains[subdomain]) {
+                if (options.subdomains[subdomain].setHeaders) {
+
+                    headers = Object.assign(headers, options.subdomains[subdomain].setHeaders["default"]);
+                    headers = Object.assign(headers, options.subdomains[subdomain].setHeaders[url]);
+                }
+            }
+            else if (subdomain === "") {
+                headers = Object.assign(headers, options.setHeaders["default"]);
+                headers = Object.assign(headers, options.setHeaders[url]);
+            }
+
+            if (acceptEncoding) { headers["Vary"] = "Accept-Encoding"; }
+            if (mimeTypes[path.extname(filename)]) { headers["Content-Type"] = mimeTypes[path.extname(filename)]; }
+            if (cacheControl && statusCode === 200) { headers["Cache-Control"] = cacheControl; }
+            else if (statusCode === 200) { headers["Cache-Control"] = "no-cache"; }
+
+            if (res.req.method.toLocaleUpperCase() === "HEAD") {
+
+                headers["Content-Length"] = stats.size;
+                res.writeHead(statusCode, headers);
+                res.end();
+            }
+            else if (/\bgzip\b/.test(acceptEncoding)) {
+
+                headers["Content-Encoding"] = "gzip";
+                res.writeHead(statusCode, headers);
+                pipeline(raw, zlib.createGzip(), res, onError);
+            }
+            else if (/\bdeflate\b/.test(acceptEncoding)) {
+
+                headers["Content-Encoding"] = "deflate";
+                res.writeHead(statusCode, headers);
+                pipeline(raw, zlib.createDeflate(), res, onError);
+            }
+            else if (/\bbr\b/.test(acceptEncoding)) {
+
+                headers["Content-Encoding"] = "br";
+                res.writeHead(statusCode, headers);
+                pipeline(raw, zlib.createBrotliCompress(), res, onError);
+            }
+            else {
+
+                headers["Content-Length"] = stats.size;
+                res.writeHead(statusCode, headers);
+                pipeline(raw, res, onError);
+            }
+        }
+        else if (typeof fn_not_found === "function")
             fn_not_found();
     });
 }
@@ -232,6 +351,109 @@ function not_found_content(req, res) {
     }
     res.end();
 }
+/**
+ * Parse url host
+ * @param {string} host
+ * @returns{{
+ *  port:string|null,
+ *  tld:string|null,
+ *  domain:string|null,
+ *  subdomains:[],
+ *  hostname:string,
+ *  host:string
+ * }}
+ */
+function parseHost(host) {
+
+    // List of Internet top-level domains
+    var tld = ["aaa", "aarp", "abarth", "abb", "abbott", "abbvie", "abc", "able", "abogado", "abudhabi", "ac", "academy", "accenture", "accountant", "accountants", "aco", "actor", "ad", "adac", "ads", "adult", "ae", "aeg", "aero", "aetna", "af", "afl", "africa", "ag", "agakhan", "agency", "ai", "aig", "airbus", "airforce", "airtel", "akdn", "al", "alfaromeo", "alibaba", "alipay", "allfinanz", "allstate", "ally", "alsace", "alstom", "am", "amazon", "americanexpress", "americanfamily", "amex", "amfam", "amica", "amsterdam", "analytics", "android", "anquan", "anz", "ao", "aol", "apartments", "app", "apple", "aq", "aquarelle", "ar", "arab", "aramco", "archi", "army", "arpa", "art", "arte", "as", "asda", "asia", "associates", "at", "athleta", "attorney", "au", "auction", "audi", "audible", "audio", "auspost", "author", "auto", "autos", "avianca", "aw", "aws", "ax", "axa", "az", "azure", "ba", "baby", "baidu", "banamex", "bananarepublic", "band", "bank", "bar", "barcelona", "barclaycard", "barclays", "barefoot", "bargains", "baseball", "basketball", "bauhaus", "bayern", "bb", "bbc", "bbt", "bbva", "bcg", "bcn", "bd", "be", "beats", "beauty", "beer", "bentley", "berlin", "best", "bestbuy", "bet", "bf", "bg", "bh", "bharti", "bi", "bible", "bid", "bike", "bing", "bingo", "bio", "biz", "bj", "black", "blackfriday", "blockbuster", "blog", "bloomberg", "blue", "bm", "bms", "bmw", "bn", "bnpparibas", "bo", "boats", "boehringer", "bofa", "bom", "bond", "boo", "book", "booking", "bosch", "bostik", "boston", "bot", "boutique", "box", "br", "bradesco", "bridgestone", "broadway", "broker", "brother", "brussels", "bs", "bt", "bugatti", "build", "builders", "business", "buy", "buzz", "bv", "bw", "by", "bz", "bzh", "ca", "cab", "cafe", "cal", "call", "calvinklein", "cam", "camera", "camp", "cancerresearch", "canon", "capetown", "capital", "capitalone", "car", "caravan", "cards", "care", "career", "careers", "cars", "casa", "case", "cash", "casino", "cat", "catering", "catholic", "cba", "cbn", "cbre", "cbs", "cc", "cd", "center", "ceo", "cern", "cf", "cfa", "cfd", "cg", "ch", "chanel", "channel", "charity", "chase", "chat", "cheap", "chintai", "christmas", "chrome", "church", "ci", "cipriani", "circle", "cisco", "citadel", "citi", "citic", "city", "cityeats", "ck", "cl", "claims", "cleaning", "click", "clinic", "clinique", "clothing", "cloud", "club", "clubmed", "cm", "cn", "co", "coach", "codes", "coffee", "college", "cologne", "com", "comcast", "commbank", "community", "company", "compare", "computer", "comsec", "condos", "construction", "consulting", "contact", "contractors", "cooking", "cookingchannel", "cool", "coop", "corsica", "country", "coupon", "coupons", "courses", "cpa", "cr", "credit", "creditcard", "creditunion", "cricket", "crown", "crs", "cruise", "cruises", "cu", "cuisinella", "cv", "cw", "cx", "cy", "cymru", "cyou", "cz", "dabur", "dad", "dance", "data", "date", "dating", "datsun", "day", "dclk", "dds", "de", "deal", "dealer", "deals", "degree", "delivery", "dell", "deloitte", "delta", "democrat", "dental", "dentist", "desi", "design", "dev", "dhl", "diamonds", "diet", "digital", "direct", "directory", "discount", "discover", "dish", "diy", "dj", "dk", "dm", "dnp", "do", "docs", "doctor", "dog", "domains", "dot", "download", "drive", "dtv", "dubai", "dunlop", "dupont", "durban", "dvag", "dvr", "dz", "earth", "eat", "ec", "eco", "edeka", "edu", "education", "ee", "eg", "email", "emerck", "energy", "engineer", "engineering", "enterprises", "epson", "equipment", "er", "ericsson", "erni", "es", "esq", "estate", "et", "etisalat", "eu", "eurovision", "eus", "events", "exchange", "expert", "exposed", "express", "extraspace", "fage", "fail", "fairwinds", "faith", "family", "fan", "fans", "farm", "farmers", "fashion", "fast", "fedex", "feedback", "ferrari", "ferrero", "fi", "fiat", "fidelity", "fido", "film", "final", "finance", "financial", "fire", "firestone", "firmdale", "fish", "fishing", "fit", "fitness", "fj", "fk", "flickr", "flights", "flir", "florist", "flowers", "fly", "fm", "fo", "foo", "food", "foodnetwork", "football", "ford", "forex", "forsale", "forum", "foundation", "fox", "fr", "free", "fresenius", "frl", "frogans", "frontdoor", "frontier", "ftr", "fujitsu", "fun", "fund", "furniture", "futbol", "fyi", "ga", "gal", "gallery", "gallo", "gallup", "game", "games", "gap", "garden", "gay", "gb", "gbiz", "gd", "gdn", "ge", "gea", "gent", "genting", "george", "gf", "gg", "ggee", "gh", "gi", "gift", "gifts", "gives", "giving", "gl", "glass", "gle", "global", "globo", "gm", "gmail", "gmbh", "gmo", "gmx", "gn", "godaddy", "gold", "goldpoint", "golf", "goo", "goodyear", "goog", "google", "gop", "got", "gov", "gp", "gq", "gr", "grainger", "graphics", "gratis", "green", "gripe", "grocery", "group", "gs", "gt", "gu", "guardian", "gucci", "guge", "guide", "guitars", "guru", "gw", "gy", "hair", "hamburg", "hangout", "haus", "hbo", "hdfc", "hdfcbank", "health", "healthcare", "help", "helsinki", "here", "hermes", "hgtv", "hiphop", "hisamitsu", "hitachi", "hiv", "hk", "hkt", "hm", "hn", "hockey", "holdings", "holiday", "homedepot", "homegoods", "homes", "homesense", "honda", "horse", "hospital", "host", "hosting", "hot", "hoteles", "hotels", "hotmail", "house", "how", "hr", "hsbc", "ht", "hu", "hughes", "hyatt", "hyundai", "ibm", "icbc", "ice", "icu", "id", "ie", "ieee", "ifm", "ikano", "il", "im", "imamat", "imdb", "immo", "immobilien", "in", "inc", "industries", "infiniti", "info", "ing", "ink", "institute", "insurance", "insure", "int", "international", "intuit", "investments", "io", "ipiranga", "iq", "ir", "irish", "is", "ismaili", "ist", "istanbul", "it", "itau", "itv", "jaguar", "java", "jcb", "je", "jeep", "jetzt", "jewelry", "jio", "jll", "jm", "jmp", "jnj", "jo", "jobs", "joburg", "jot", "joy", "jp", "jpmorgan", "jprs", "juegos", "juniper", "kaufen", "kddi", "ke", "kerryhotels", "kerrylogistics", "kerryproperties", "kfh", "kg", "kh", "ki", "kia", "kids", "kim", "kinder", "kindle", "kitchen", "kiwi", "km", "kn", "koeln", "komatsu", "kosher", "kp", "kpmg", "kpn", "kr", "krd", "kred", "kuokgroup", "kw", "ky", "kyoto", "kz", "la", "lacaixa", "lamborghini", "lamer", "lancaster", "lancia", "land", "landrover", "lanxess", "lasalle", "lat", "latino", "latrobe", "law", "lawyer", "lb", "lc", "lds", "lease", "leclerc", "lefrak", "legal", "lego", "lexus", "lgbt", "li", "lidl", "life", "lifeinsurance", "lifestyle", "lighting", "like", "lilly", "limited", "limo", "lincoln", "linde", "link", "lipsy", "live", "living", "lk", "llc", "llp", "loan", "loans", "locker", "locus", "loft", "lol", "london", "lotte", "lotto", "love", "lpl", "lplfinancial", "lr", "ls", "lt", "ltd", "ltda", "lu", "lundbeck", "luxe", "luxury", "lv", "ly", "ma", "macys", "madrid", "maif", "maison", "makeup", "man", "management", "mango", "map", "market", "marketing", "markets", "marriott", "marshalls", "maserati", "mattel", "mba", "mc", "mckinsey", "md", "me", "med", "media", "meet", "melbourne", "meme", "memorial", "men", "menu", "merckmsd", "mg", "mh", "miami", "microsoft", "mil", "mini", "mint", "mit", "mitsubishi", "mk", "ml", "mlb", "mls", "mm", "mma", "mn", "mo", "mobi", "mobile", "moda", "moe", "moi", "mom", "monash", "money", "monster", "mormon", "mortgage", "moscow", "moto", "motorcycles", "mov", "movie", "mp", "mq", "mr", "ms", "msd", "mt", "mtn", "mtr", "mu", "museum", "music", "mutual", "mv", "mw", "mx", "my", "mz", "na", "nab", "nagoya", "name", "natura", "navy", "nba", "nc", "ne", "nec", "net", "netbank", "netflix", "network", "neustar", "new", "news", "next", "nextdirect", "nexus", "nf", "nfl", "ng", "ngo", "nhk", "ni", "nico", "nike", "nikon", "ninja", "nissan", "nissay", "nl", "no", "nokia", "northwesternmutual", "norton", "now", "nowruz", "nowtv", "np", "nr", "nra", "nrw", "ntt", "nu", "nyc", "nz", "obi", "observer", "office", "okinawa", "olayan", "olayangroup", "oldnavy", "ollo", "om", "omega", "one", "ong", "onl", "online", "ooo", "open", "oracle", "orange", "org", "organic", "origins", "osaka", "otsuka", "ott", "ovh", "pa", "page", "panasonic", "paris", "pars", "partners", "parts", "party", "passagens", "pay", "pccw", "pe", "pet", "pf", "pfizer", "pg", "ph", "pharmacy", "phd", "philips", "phone", "photo", "photography", "photos", "physio", "pics", "pictet", "pictures", "pid", "pin", "ping", "pink", "pioneer", "pizza", "pk", "pl", "place", "play", "playstation", "plumbing", "plus", "pm", "pn", "pnc", "pohl", "poker", "politie", "porn", "post", "pr", "pramerica", "praxi", "press", "prime", "pro", "prod", "productions", "prof", "progressive", "promo", "properties", "property", "protection", "pru", "prudential", "ps", "pt", "pub", "pw", "pwc", "py", "qa", "qpon", "quebec", "quest", "racing", "radio", "re", "read", "realestate", "realtor", "realty", "recipes", "red", "redstone", "redumbrella", "rehab", "reise", "reisen", "reit", "reliance", "ren", "rent", "rentals", "repair", "report", "republican", "rest", "restaurant", "review", "reviews", "rexroth", "rich", "richardli", "ricoh", "ril", "rio", "rip", "ro", "rocher", "rocks", "rodeo", "rogers", "room", "rs", "rsvp", "ru", "rugby", "ruhr", "run", "rw", "rwe", "ryukyu", "sa", "saarland", "safe", "safety", "sakura", "sale", "salon", "samsclub", "samsung", "sandvik", "sandvikcoromant", "sanofi", "sap", "sarl", "sas", "save", "saxo", "sb", "sbi", "sbs", "sc", "sca", "scb", "schaeffler", "schmidt", "scholarships", "school", "schule", "schwarz", "science", "scot", "sd", "se", "search", "seat", "secure", "security", "seek", "select", "sener", "services", "ses", "seven", "sew", "sex", "sexy", "sfr", "sg", "sh", "shangrila", "sharp", "shaw", "shell", "shia", "shiksha", "shoes", "shop", "shopping", "shouji", "show", "showtime", "si", "silk", "sina", "singles", "site", "sj", "sk", "ski", "skin", "sky", "skype", "sl", "sling", "sm", "smart", "smile", "sn", "sncf", "so", "soccer", "social", "softbank", "software", "sohu", "solar", "solutions", "song", "sony", "soy", "spa", "space", "sport", "spot", "sr", "srl", "ss", "st", "stada", "staples", "star", "statebank", "statefarm", "stc", "stcgroup", "stockholm", "storage", "store", "stream", "studio", "study", "style", "su", "sucks", "supplies", "supply", "support", "surf", "surgery", "suzuki", "sv", "swatch", "swiss", "sx", "sy", "sydney", "systems", "sz", "tab", "taipei", "talk", "taobao", "target", "tatamotors", "tatar", "tattoo", "tax", "taxi", "tc", "tci", "td", "tdk", "team", "tech", "technology", "tel", "temasek", "tennis", "teva", "tf", "tg", "th", "thd", "theater", "theatre", "tiaa", "tickets", "tienda", "tiffany", "tips", "tires", "tirol", "tj", "tjmaxx", "tjx", "tk", "tkmaxx", "tl", "tm", "tmall", "tn", "to", "today", "tokyo", "tools", "top", "toray", "toshiba", "total", "tours", "town", "toyota", "toys", "tr", "trade", "trading", "training", "travel", "travelchannel", "travelers", "travelersinsurance", "trust", "trv", "tt", "tube", "tui", "tunes", "tushu", "tv", "tvs", "tw", "tz", "ua", "ubank", "ubs", "ug", "uk", "unicom", "university", "uno", "uol", "ups", "us", "uy", "uz", "va", "vacations", "vana", "vanguard", "vc", "ve", "vegas", "ventures", "verisign", "versicherung", "vet", "vg", "vi", "viajes", "video", "vig", "viking", "villas", "vin", "vip", "virgin", "visa", "vision", "viva", "vivo", "vlaanderen", "vn", "vodka", "volkswagen", "volvo", "vote", "voting", "voto", "voyage", "vu", "vuelos", "wales", "walmart", "walter", "wang", "wanggou", "watch", "watches", "weather", "weatherchannel", "webcam", "weber", "website", "wed", "wedding", "weibo", "weir", "wf", "whoswho", "wien", "wiki", "williamhill", "win", "windows", "wine", "winners", "wme", "wolterskluwer", "woodside", "work", "works", "world", "wow", "ws", "wtc", "wtf", "xbox", "xerox", "xfinity", "xihuan", "xin", "xn--11b4c3d", "xn--1ck2e1b", "xn--1qqw23a", "xn--2scrj9c", "xn--30rr7y", "xn--3bst00m", "xn--3ds443g", "xn--3e0b707e", "xn--3hcrj9c", "xn--3pxu8k", "xn--42c2d9a", "xn--45br5cyl", "xn--45brj9c", "xn--45q11c", "xn--4dbrk0ce", "xn--4gbrim", "xn--54b7fta0cc", "xn--55qw42g", "xn--55qx5d", "xn--5su34j936bgsg", "xn--5tzm5g", "xn--6frz82g", "xn--6qq986b3xl", "xn--80adxhks", "xn--80ao21a", "xn--80aqecdr1a", "xn--80asehdb", "xn--80aswg", "xn--8y0a063a", "xn--90a3ac", "xn--90ae", "xn--90ais", "xn--9dbq2a", "xn--9et52u", "xn--9krt00a", "xn--b4w605ferd", "xn--bck1b9a5dre4c", "xn--c1avg", "xn--c2br7g", "xn--cck2b3b", "xn--cckwcxetd", "xn--cg4bki", "xn--clchc0ea0b2g2a9gcd", "xn--czr694b", "xn--czrs0t", "xn--czru2d", "xn--d1acj3b", "xn--d1alf", "xn--e1a4c", "xn--eckvdtc9d", "xn--efvy88h", "xn--fct429k", "xn--fhbei", "xn--fiq228c5hs", "xn--fiq64b", "xn--fiqs8s", "xn--fiqz9s", "xn--fjq720a", "xn--flw351e", "xn--fpcrj9c3d", "xn--fzc2c9e2c", "xn--fzys8d69uvgm", "xn--g2xx48c", "xn--gckr3f0f", "xn--gecrj9c", "xn--gk3at1e", "xn--h2breg3eve", "xn--h2brj9c", "xn--h2brj9c8c", "xn--hxt814e", "xn--i1b6b1a6a2e", "xn--imr513n", "xn--io0a7i", "xn--j1aef", "xn--j1amh", "xn--j6w193g", "xn--jlq480n2rg", "xn--jlq61u9w7b", "xn--jvr189m", "xn--kcrx77d1x4a", "xn--kprw13d", "xn--kpry57d", "xn--kput3i", "xn--l1acc", "xn--lgbbat1ad8j", "xn--mgb9awbf", "xn--mgba3a3ejt", "xn--mgba3a4f16a", "xn--mgba7c0bbn0a", "xn--mgbaakc7dvf", "xn--mgbaam7a8h", "xn--mgbab2bd", "xn--mgbah1a3hjkrd", "xn--mgbai9azgqp6j", "xn--mgbayh7gpa", "xn--mgbbh1a", "xn--mgbbh1a71e", "xn--mgbc0a9azcg", "xn--mgbca7dzdo", "xn--mgbcpq6gpa1a", "xn--mgberp4a5d4ar", "xn--mgbgu82a", "xn--mgbi4ecexp", "xn--mgbpl2fh", "xn--mgbt3dhd", "xn--mgbtx2b", "xn--mgbx4cd0ab", "xn--mix891f", "xn--mk1bu44c", "xn--mxtq1m", "xn--ngbc5azd", "xn--ngbe9e0a", "xn--ngbrx", "xn--node", "xn--nqv7f", "xn--nqv7fs00ema", "xn--nyqy26a", "xn--o3cw4h", "xn--ogbpf8fl", "xn--otu796d", "xn--p1acf", "xn--p1ai", "xn--pgbs0dh", "xn--pssy2u", "xn--q7ce6a", "xn--q9jyb4c", "xn--qcka1pmc", "xn--qxa6a", "xn--qxam", "xn--rhqv96g", "xn--rovu88b", "xn--rvc1e0am3e", "xn--s9brj9c", "xn--ses554g", "xn--t60b56a", "xn--tckwe", "xn--tiq49xqyj", "xn--unup4y", "xn--vermgensberater-ctb", "xn--vermgensberatung-pwb", "xn--vhquv", "xn--vuq861b", "xn--w4r85el8fhu5dnra", "xn--w4rs40l", "xn--wgbh1c", "xn--wgbl6a", "xn--xhq521b", "xn--xkc2al3hye2a", "xn--xkc2dl3a5ee0h", "xn--y9a3aq", "xn--yfro4i67o", "xn--ygbi2ammx", "xn--zfr164b", "xxx", "xyz", "yachts", "yahoo", "yamaxun", "yandex", "ye", "yodobashi", "yoga", "yokohama", "you", "youtube", "yt", "yun", "za", "zappos", "zara", "zero", "zip", "zm", "zone", "zuerich", "zw"];
+    var _host = {
+        port: null,
+        tld: null,
+        domain: null,
+        subdomains: []
+    };
+
+    host = host ? (host + "") : "";
+
+    // get port
+    host = host.split(":");
+    _host.port = host.length > 1 ? host.pop() : null;
+    host = host.join(":");
+
+    var ip = isValidIP(host);
+    if (ip) {
+        _host.domain = ip;
+        return _host;
+    }
+
+    host = host.split(".");
+
+    // get tld
+    _host.tld = tld.includes(host[host.length - 1]) ? host.pop() : null;
+
+    // get domain
+    _host.domain = host.length > 0 ? host.pop() : null;
+    if (_host.tld) { _host.domain += "." + _host.tld; }
+
+    // get subdomains
+    _host.subdomains = host.length > 0 ? host : [];
+
+    Object.defineProperty(_host, "hostname", {
+        get: function () {
+            var arr = Array.from(_host.subdomains);
+            if (_host.domain) { arr.push(_host.domain); }
+            if (_host.tld) { arr.push(_host.tld); }
+            return arr.join(".");
+        },
+        set: function (val) { _host = parseHost(val); }
+    });
+
+    Object.defineProperty(_host, "host", {
+        get: function () {
+            var result = _host.hostname;
+            if (_host.port) { result += ":" + _host.port; }
+            return result;
+        },
+        set: function (val) { _host = parseHost(val); }
+    });
+
+    return _host;
+}
+/**
+ * Check if string is IP address (IPv4) "192.168.5.68" or "192-168-5-68"
+ * Returns string "192.168.5.68" or null
+ * @param {string} str
+ * @returns {string|null}
+ */
+function isValidIP(str) {
+
+    str = (str + "").trim().replace(/-/g, ".");
+    // Regular expression to check if string is a IP address
+    const regexExp = /^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/gi;
+
+    if (regexExp.test(str))
+        return str;
+
+    return null;
+}
+
+function isValidatePath(strPath) {
+
+    try { strPath = decodeURI(strPath); } catch (err) { return false; }
+    if (strPath.indexOf('\0') !== -1) { return false; }
+    if (strPath.indexOf('..') !== -1) { return false; }
+    if (strPath === '/') { return '\\'; }
+    strPath = path.normalize(strPath);
+    strPath = strPath.replace(/^(\.\.(\/|\\|$))+/, '');
+    return strPath;
+}
 
 module.exports = server;
 server.options = options;
+server.static_file = static_file;
+server.not_found_content = not_found_content;
+server.parseHost = parseHost;
+server.isSSL = isSSL;
+server.localIP = localIP;
+server.isValidatePath = isValidatePath;

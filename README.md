@@ -1,6 +1,7 @@
 # tiny-https-server: Easy tiny https web server middleware.
 
 [![npm-version](https://badgen.net/npm/v/tiny-https-server)](https://www.npmjs.com/package/tiny-https-server)
+[![npm-total-downloads](https://badgen.net/npm/dt/tiny-https-server)](https://www.npmjs.com/package/tiny-https-server)
 [![npm-week-downloads](https://badgen.net/npm/dw/tiny-https-server)](https://www.npmjs.com/package/tiny-https-server)
 
 Easy tiny https web server middleware.
@@ -86,7 +87,29 @@ config-sets.json
       "pathToPrivkey": "./cert/localhost-key.pem",
       "pathToCert": "./cert/localhost-cert.pem",
       "subdomains": {
-        "test": "./public/test"
+        "test": {
+          "document_root": "./public/test"
+        }
+      },
+      "cacheControl": {
+        "fileTypes": {
+          "bmp": "max-age=2592000",
+          "jpeg": "max-age=2592000",
+          "jpg": "max-age=2592000",
+          "png": "max-age=2592000",
+          "svg": "max-age=2592000",
+          "pdf": "max-age=2592000",
+          "html": "max-age=86400",
+          "css": "max-age=86400",
+          "js": "max-age=86400",
+          "webp": "max-age=2592000"
+        }
+      },
+      "setHeaders": {
+        "default": {},
+        "/": {
+          "X-Frame-Options": "DENY"
+        }
       }
     },
     "log_report": {
@@ -98,6 +121,10 @@ config-sets.json
     "browse_url": {
       "launch_url": "",
       "enabled": false
+    },
+    "try_to_run": {
+      "retrying": 10,
+      "enabled": true
     }
   },
   "development": {
@@ -113,7 +140,7 @@ config-sets.json
       "save_only_uncaughtException": false
     },
     "browse_url": {
-      "launch_url": "http://localhost:1337/",
+      "launch_url": "https://localhost/",
       "enabled": true
     }
   }

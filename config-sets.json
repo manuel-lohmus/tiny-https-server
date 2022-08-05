@@ -10,7 +10,29 @@
       "pathToPrivkey": "./cert/localhost-key.pem",
       "pathToCert": "./cert/localhost-cert.pem",
       "subdomains": {
-        "test": "./public/test"
+        "test": {
+          "document_root": "./public/test"
+        }
+      },
+      "cacheControl": {
+        "fileTypes": {
+          "bmp": "max-age=2592000",
+          "jpeg": "max-age=2592000",
+          "jpg": "max-age=2592000",
+          "png": "max-age=2592000",
+          "svg": "max-age=2592000",
+          "pdf": "max-age=2592000",
+          "html": "max-age=86400",
+          "css": "max-age=86400",
+          "js": "max-age=86400",
+          "webp": "max-age=2592000"
+        }
+      },
+      "setHeaders": {
+        "default": {},
+        "/": {
+          "X-Frame-Options": "DENY"
+        }
       }
     },
     "log_report": {
@@ -25,13 +47,15 @@
     },
     "try_to_run": {
       "retrying": 10,
-      "enabled": true
+      "enabled": false
     }
   },
   "development": {
     "tiny_https_server": {
       "subdomains": {
-        "test": "./public/test"
+        "test": {
+          "document_root": "./public/test"
+        }
       }
     },
     "log_report": {
@@ -41,7 +65,7 @@
       "save_only_uncaughtException": false
     },
     "browse_url": {
-      "launch_url": "http://localhost:1337/",
+      "launch_url": "https://localhost/",
       "enabled": true
     }
   }

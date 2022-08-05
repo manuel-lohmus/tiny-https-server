@@ -20,7 +20,7 @@
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <ProjectTypeGuids>{3AF33F2E-1136-4D97-BBB7-1795711AC8B8};{349c5851-65df-11da-9384-00065b846f21};{9092AA53-FB77-4645-B42D-1CCCA6BD08BD}</ProjectTypeGuids>
     <NodejsPort>80</NodejsPort>
-    <StartWebBrowser>True</StartWebBrowser>
+    <StartWebBrowser>False</StartWebBrowser>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -57,6 +57,8 @@
     <Folder Include="public\" />
     <Folder Include="public\test\" />
     <Folder Include="public\www\" />
+    <Folder Include="public\www\.well-known\" />
+    <Folder Include="public\www\.well-known\acme-challenge\" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="server.min.js">

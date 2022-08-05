@@ -1,6 +1,6 @@
 {
   "name": "tiny-https-server",
-  "version": "1.2.5",
+  "version": "1.5.11",
   "description": "Easy tiny https web server middleware.",
   "keywords": [
     "tiny",
@@ -45,11 +45,11 @@
     "url": "git+https://github.com/manuel-lohmus/tiny-https-server.git"
   },
   "dependencies": {
-    "config-sets": "^2.2.1"
+    "config-sets": "^2.2.5"
   },
   "devDependencies": {
-    "browse-url": "^1.1.2",
-    "log-report": "^2.1.4",
+    "browse-url": "^1.1.5",
+    "log-report": "^2.1.5",
     "try-to-run": "^1.3.2"
   }
 }
