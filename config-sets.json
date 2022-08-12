@@ -43,7 +43,7 @@
     },
     "browse_url": {
       "launch_url": "",
-      "enabled": false
+      "enabled": true
     },
     "try_to_run": {
       "retrying": 10,

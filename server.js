@@ -63,9 +63,9 @@ if (isSSL) {
     if (!options.port) { options.port = 443; }
 
     http.createServer(function (req, res) {
-        if (req.url.startsWith("/."))
+        if (req.url.startsWith("/.well-known/acme-challenge/") && isValidatePath(req.url.substr(2)))
             // for .well-known/acme-challenge/
-            static_reqest(req, res)
+            static_request(req, res)
         else {
             // redirect http to https
             res.writeHead(302, { "Location": "https://" + req.headers["host"] + req.url });
@@ -78,7 +78,7 @@ var server = isSSL
     ? https.createServer({ key: fs.readFileSync(options.pathToPrivkey), cert: fs.readFileSync(options.pathToCert) })
     : http.createServer();
 
-var requestArr = [node_modules_reqest, static_reqest];
+var requestArr = [node_modules_request, static_request];
 server.on("newListener", function (event, listener) {
 
     if (event === "request") {
@@ -93,13 +93,24 @@ server.emit = function (eventName, req, res) {
 
         setImmediate(function () {
 
-            req.iterator = requestArr.entries();
             res.on('close', function () {
-                req.iterator = undefined;
-                //delete req.iterator;
+
+                if (req.iterator) {
+                    req.iterator = undefined;
+                    //delete req.iterator;
+                }
+
                 delete res.fnRequest;
+
                 log(req, res);
             });
+
+            if (!req.client.remoteAddress || !isValidatePath(req.url)) {
+                bad_request(req, res)
+                return;
+            }
+
+            req.iterator = requestArr.entries();
 
             function next() {
 
@@ -128,12 +139,13 @@ server.listen(options.port, function (err) {
         console.log("Webserver port:" + options.port + " pid:" + process.pid);
 });
 
-function log(req, res) {
+function log(req, res, prefix) {
 
     var date = new Date();
     var fileName = path.resolve(process.cwd(), options.logDir, date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate() + ".log");
-    var msg = req.client.remoteAddress + " ";
-    msg += "[" + date.toISOString() + "] ";
+    var msg = prefix ? prefix + " " : "";
+    msg += req.client.remoteAddress + " ";
+    msg += "[" + date.toLocaleTimeString('et-EE') + "] ";
     msg += res.statusCode + " ";
     msg += '"' + req.headers.host + " " + req.method + " " + req.url + " HTTP/" + req.httpVersion + '" ';
     msg += req.client.remotePort + " ";
@@ -151,14 +163,12 @@ function log(req, res) {
  * @param {http.IncomingMessage} req
  * @param {http.ServerResponse} res
  */
-function node_modules_reqest(req, res, next) {
+function node_modules_request(req, res, next) {
 
     if (req.url.startsWith("/node_modules") && req.method.toLocaleUpperCase() === "GET") {
 
         var filename = "";
-        var validatePath = isValidatePath(req.url);
-        if (!validatePath) { not_found_content(req, res); return; }
-        var arrPath = validatePath.split("/").filter(function (v) { return v; });
+        var arrPath = req.url.split("/").filter(function (v) { return v; });
 
         if (arrPath.length === 2 && fs.existsSync(path.resolve(process.cwd(), arrPath.join("/")))) {
 
@@ -189,14 +199,12 @@ function node_modules_reqest(req, res, next) {
  * @param {http.IncomingMessage} req
  * @param {http.ServerResponse} res
  */
-function static_reqest(req, res) {
+function static_request(req, res) {
 
-    var validatePath = isValidatePath(req.url);
-    if (!validatePath) { not_found_content(req, res); return; }
-    var filename = validatePath.split("?").shift();
+    var filename = req.url.split("?").shift();
 
-    if (!filename.length || filename.endsWith("\\")) { filename += options.directory_index; }
-    if (filename.startsWith("\\")) { filename = filename.substr(1); }
+    if (!filename.length || filename.endsWith("/")) { filename += options.directory_index; }
+    if (filename.startsWith("/")) { filename = filename.substr(1); }
 
     var host = req.headers.host;
     var document_root = "";
@@ -229,7 +237,9 @@ function static_reqest(req, res) {
         }
     }
 
-    if (document_root && (req.method.toLocaleUpperCase() === "GET" || req.method.toLocaleUpperCase() === "HEAD")) {
+    if (document_root
+        && (req.method.toLocaleUpperCase() === "GET" || req.method.toLocaleUpperCase() === "HEAD")
+        && req.url.indexOf("?") === -1) {
 
         filename = path.join(process.cwd(), document_root, filename);
 
@@ -246,7 +256,7 @@ function static_reqest(req, res) {
         }, host);
     }
     else {
-        not_found_content(req, res);
+        not_found_content(req, res, 3000);
     }
 }
 /**
@@ -335,7 +345,7 @@ function static_file(filename, res, fn_not_found, subdomain) {
  * @param {http.IncomingMessage} req
  * @param {http.ServerResponse} res
  */
-function not_found_content(req, res) {
+function not_found_content(req, res, set_timeout) {
 
     if (cs.isDebug) {
         console.info("Warning: 404 Not Found", {
@@ -349,7 +359,11 @@ function not_found_content(req, res) {
     if (options.isDebug) {
         res.write("Headers: " + JSON.stringify(req.headers, null, 2) + "\n");
     }
-    res.end();
+
+    if (set_timeout) {
+        setTimeout(function () { res.end(); }, set_timeout);
+    }
+    else { res.end(); }
 }
 /**
  * Parse url host
@@ -443,10 +457,21 @@ function isValidatePath(strPath) {
     try { strPath = decodeURI(strPath); } catch (err) { return false; }
     if (strPath.indexOf('\0') !== -1) { return false; }
     if (strPath.indexOf('..') !== -1) { return false; }
+    if (strPath.indexOf('/.') !== -1) { return false; }
     if (strPath === '/') { return '\\'; }
     strPath = path.normalize(strPath);
     strPath = strPath.replace(/^(\.\.(\/|\\|$))+/, '');
     return strPath;
+}
+
+function bad_request(req, res) {
+
+    res.writeHead(400, { "Content-Type": "text/plain" });
+    res.write("400 Bad Request\n");
+
+    setTimeout(function () {
+        res.end();
+    }, 3000);
 }
 
 module.exports = server;
