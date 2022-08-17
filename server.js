@@ -63,9 +63,13 @@ if (isSSL) {
     if (!options.port) { options.port = 443; }
 
     http.createServer(function (req, res) {
-        if (req.url.startsWith("/.well-known/acme-challenge/") && isValidatePath(req.url.substr(2)))
+
+        res.on('close', function () { log(req, res); });
+
+        if (req.url.startsWith("/.well-known/acme-challenge/") && isValidatePath(req.url.substr(2))) {
             // for .well-known/acme-challenge/
-            static_request(req, res)
+            static_request(req, res);
+        }
         else {
             // redirect http to https
             res.writeHead(302, { "Location": "https://" + req.headers["host"] + req.url });
@@ -142,13 +146,25 @@ server.listen(options.port, function (err) {
 function log(req, res, prefix) {
 
     var date = new Date();
-    var fileName = path.resolve(process.cwd(), options.logDir, date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate() + ".log");
+    var fileName = path.resolve(process.cwd(), options.logDir, date.getUTCFullYear() + "-" + (date.getUTCMonth() + 1) + "-" + date.getUTCDate() + ".log");
     var msg = prefix ? prefix + " " : "";
-    msg += req.client.remoteAddress + " ";
-    msg += "[" + date.toLocaleTimeString('et-EE') + "] ";
-    msg += res.statusCode + " ";
-    msg += '"' + req.headers.host + " " + req.method + " " + req.url + " HTTP/" + req.httpVersion + '" ';
-    msg += req.client.remotePort + " ";
+    // client address and port
+    msg += req.client.remoteAddress + ":" + req.client.remotePort + " ";
+    // universal time
+    var hours = date.getUTCHours().toString(),
+        minutes = date.getUTCMinutes().toString(),
+        seconds = date.getUTCSeconds().toString(),
+        milliseconds = date.getUTCMilliseconds().toString();
+    if (hours.length < 2) { hours = "0" + hours; }
+    if (minutes.length < 2) { minutes = "0" + minutes; }
+    if (seconds.length < 2) { seconds = "0" + seconds; }
+    while (milliseconds.length < 3) { milliseconds = "0" + milliseconds; }
+    msg += "[" + hours + ":" + minutes + ":" + seconds + "." + milliseconds + "] ";
+    // status code or connection refused
+    msg += res.finished ? res.statusCode + " " : "--- ";
+    // host:port method url httpVersion
+    msg += req.headers.host + (req.socket.localPort ? ":" + req.socket.localPort : "") + " " + req.method + " " + req.url + " HTTP/" + req.httpVersion + ' ';
+    // user agent
     msg += '"' + req.headers["user-agent"] + '"\r\n';
 
     fs.appendFile(
@@ -459,9 +475,10 @@ function isValidatePath(strPath) {
     if (strPath.indexOf('..') !== -1) { return false; }
     if (strPath.indexOf('/.') !== -1) { return false; }
     if (strPath === '/') { return '\\'; }
-    strPath = path.normalize(strPath);
-    strPath = strPath.replace(/^(\.\.(\/|\\|$))+/, '');
-    return strPath;
+    //strPath = path.normalize(strPath);
+    //strPath = strPath.replace(/^(\.\.(\/|\\|$))+/, '');
+    //return strPath;
+    return true;
 }
 
 function bad_request(req, res) {

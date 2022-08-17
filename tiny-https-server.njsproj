@@ -36,6 +36,9 @@
     <Content Include="config-sets.json" />
     <Content Include="index.js" />
     <Content Include="LICENSE" />
+    <Content Include="log\log-report\error.log" />
+    <Content Include="log\log-report\stderr.log" />
+    <Content Include="log\log-report\stdout.log" />
     <Content Include="mimeTypes.js" />
     <Content Include="package.json" />
     <Content Include="public\test\index.html" />
