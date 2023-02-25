@@ -71,12 +71,57 @@ while (urls.length) {
 }
 ```
 
-## Config-sets file
+## Service Worker example
 
-config-sets.json
+Read more about the ['Service Worker API'](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API)\
+Set the current 'service_worker_version' in the config-sets.json file.
 ```json
 {
   "production": {
+    "tiny_https_server": {
+      "service_worker_version": "1.0.0"
+    }
+  }
+}
+```
+
+Add to the webpage [Service Worker Script](browser.js)
+```html
+<!doctype html>
+<html>
+<head>
+    <title>Public</title>
+    <!-- Service Worker Script -->
+    <script async src="node_modules/tiny-https-server"></script>
+</head>
+<body>
+    Public
+</body>
+</html>
+```
+Start a `/$` url that bypasses the Service Worker cache.\
+For example `/$service_worker_version`.
+
+## Config-sets file
+
+config-sets.json [*Read more...*](https://github.com/manuel-lohmus/config-sets)
+```json
+{
+  "production": {
+    "log_report": {
+      "logDir": "./log/log-report",
+      "enabled": true,
+      "clear_on_startup": false,
+      "save_only_uncaughtException": true
+    },
+    "browse_url": {
+      "launch_url": "",
+      "enabled": false
+    },
+    "try_to_run": {
+      "retrying": 10,
+      "enabled": true
+    },
     "tiny_https_server": {
       "domain": "localhost",
       "port": 443,
@@ -93,16 +138,19 @@ config-sets.json
       },
       "cacheControl": {
         "fileTypes": {
+          "webp": "max-age=2592000",
           "bmp": "max-age=2592000",
           "jpeg": "max-age=2592000",
           "jpg": "max-age=2592000",
           "png": "max-age=2592000",
           "svg": "max-age=2592000",
           "pdf": "max-age=2592000",
+          "woff2": "max-age=2592000",
+          "woff": "max-age=2592000",
+          "image/svg+xml": "max-age=2592000",
           "html": "max-age=86400",
           "css": "max-age=86400",
-          "js": "max-age=86400",
-          "webp": "max-age=2592000"
+          "js": "max-age=86400"
         }
       },
       "setHeaders": {
@@ -110,29 +158,11 @@ config-sets.json
         "/": {
           "X-Frame-Options": "DENY"
         }
-      }
-    },
-    "log_report": {
-      "logDir": "./log/log-report",
-      "enabled": true,
-      "clear_on_startup": false,
-      "save_only_uncaughtException": true
-    },
-    "browse_url": {
-      "launch_url": "",
-      "enabled": false
-    },
-    "try_to_run": {
-      "retrying": 10,
-      "enabled": true
+      },
+      "service_worker_version": "1.0.0"
     }
   },
   "development": {
-    "tiny_https_server": {
-      "subdomains": {
-        "test": "./public/test"
-      }
-    },
     "log_report": {
       "logDir": "./log/log-report",
       "enabled": true,
@@ -142,13 +172,47 @@ config-sets.json
     "browse_url": {
       "launch_url": "https://localhost/",
       "enabled": true
+    },
+    "try_to_run": {
+      "enabled": false
+    },
+    "tiny_https_server": {
+      "subdomains": {
+        "test": {
+          "document_root": "./public/test"
+        }
+      }
     }
   }
 }
 ```
 
+Read more about the ['log-report'](https://github.com/manuel-lohmus/log-report) module.\
+Read more about the ['try-to-run'](https://github.com/manuel-lohmus/try-to-run) module.\
+Read more about the ['browse-url'](https://github.com/manuel-lohmus/browse-url) module.
+
 ## License
 
-[MIT](LICENSE)
 
-Copyright (c) 2021 Manuel L&otilde;hmus <manuel@hauss.ee>
+The MIT License [MIT](LICENSE)
+```txt
+Copyright (c) 2021 Manuel Lõhmus <manuel@hauss.ee>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

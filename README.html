@@ -70,10 +70,50 @@ while (urls.length) {
     require(&quot;browse-url&quot;)(urls.shift());
 }
 </code></pre>
-<h2 id="config-sets-file">Config-sets file</h2>
-<p>config-sets.json</p>
+<h2 id="service-worker-example">Service Worker example</h2>
+<p>Read more about the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API">'Service Worker API'</a><br />
+Set the current 'service_worker_version' in the config-sets.json file.</p>
 <pre><code class="language-json">{
   &quot;production&quot;: {
+    &quot;tiny_https_server&quot;: {
+      &quot;service_worker_version&quot;: &quot;1.0.0&quot;
+    }
+  }
+}
+</code></pre>
+<p>Add to the webpage <a href="browser.js">Service Worker Script</a></p>
+<pre><code class="language-html">&lt;!doctype html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;Public&lt;/title&gt;
+    &lt;!-- Service Worker Script --&gt;
+    &lt;script async src=&quot;node_modules/tiny-https-server&quot;&gt;&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    Public
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<p>Start a <code>/$</code> url that bypasses the Service Worker cache.<br />
+For example <code>/$service_worker_version</code>.</p>
+<h2 id="config-sets-file">Config-sets file</h2>
+<p>config-sets.json <a href="https://github.com/manuel-lohmus/config-sets"><em>Read more...</em></a></p>
+<pre><code class="language-json">{
+  &quot;production&quot;: {
+    &quot;log_report&quot;: {
+      &quot;logDir&quot;: &quot;./log/log-report&quot;,
+      &quot;enabled&quot;: true,
+      &quot;clear_on_startup&quot;: false,
+      &quot;save_only_uncaughtException&quot;: true
+    },
+    &quot;browse_url&quot;: {
+      &quot;launch_url&quot;: &quot;&quot;,
+      &quot;enabled&quot;: false
+    },
+    &quot;try_to_run&quot;: {
+      &quot;retrying&quot;: 10,
+      &quot;enabled&quot;: true
+    },
     &quot;tiny_https_server&quot;: {
       &quot;domain&quot;: &quot;localhost&quot;,
       &quot;port&quot;: 443,
@@ -90,16 +130,19 @@ while (urls.length) {
       },
       &quot;cacheControl&quot;: {
         &quot;fileTypes&quot;: {
+          &quot;webp&quot;: &quot;max-age=2592000&quot;,
           &quot;bmp&quot;: &quot;max-age=2592000&quot;,
           &quot;jpeg&quot;: &quot;max-age=2592000&quot;,
           &quot;jpg&quot;: &quot;max-age=2592000&quot;,
           &quot;png&quot;: &quot;max-age=2592000&quot;,
           &quot;svg&quot;: &quot;max-age=2592000&quot;,
           &quot;pdf&quot;: &quot;max-age=2592000&quot;,
+          &quot;woff2&quot;: &quot;max-age=2592000&quot;,
+          &quot;woff&quot;: &quot;max-age=2592000&quot;,
+          &quot;image/svg+xml&quot;: &quot;max-age=2592000&quot;,
           &quot;html&quot;: &quot;max-age=86400&quot;,
           &quot;css&quot;: &quot;max-age=86400&quot;,
-          &quot;js&quot;: &quot;max-age=86400&quot;,
-          &quot;webp&quot;: &quot;max-age=2592000&quot;
+          &quot;js&quot;: &quot;max-age=86400&quot;
         }
       },
       &quot;setHeaders&quot;: {
@@ -107,29 +150,11 @@ while (urls.length) {
         &quot;/&quot;: {
           &quot;X-Frame-Options&quot;: &quot;DENY&quot;
         }
-      }
-    },
-    &quot;log_report&quot;: {
-      &quot;logDir&quot;: &quot;./log/log-report&quot;,
-      &quot;enabled&quot;: true,
-      &quot;clear_on_startup&quot;: false,
-      &quot;save_only_uncaughtException&quot;: true
-    },
-    &quot;browse_url&quot;: {
-      &quot;launch_url&quot;: &quot;&quot;,
-      &quot;enabled&quot;: false
-    },
-    &quot;try_to_run&quot;: {
-      &quot;retrying&quot;: 10,
-      &quot;enabled&quot;: true
+      },
+      &quot;service_worker_version&quot;: &quot;1.0.0&quot;
     }
   },
   &quot;development&quot;: {
-    &quot;tiny_https_server&quot;: {
-      &quot;subdomains&quot;: {
-        &quot;test&quot;: &quot;./public/test&quot;
-      }
-    },
     &quot;log_report&quot;: {
       &quot;logDir&quot;: &quot;./log/log-report&quot;,
       &quot;enabled&quot;: true,
@@ -139,13 +164,45 @@ while (urls.length) {
     &quot;browse_url&quot;: {
       &quot;launch_url&quot;: &quot;https://localhost/&quot;,
       &quot;enabled&quot;: true
+    },
+    &quot;try_to_run&quot;: {
+      &quot;enabled&quot;: false
+    },
+    &quot;tiny_https_server&quot;: {
+      &quot;subdomains&quot;: {
+        &quot;test&quot;: {
+          &quot;document_root&quot;: &quot;./public/test&quot;
+        }
+      }
     }
   }
 }
 </code></pre>
+<p>Read more about the <a href="https://github.com/manuel-lohmus/log-report">'log-report'</a> module.<br />
+Read more about the <a href="https://github.com/manuel-lohmus/try-to-run">'try-to-run'</a> module.<br />
+Read more about the <a href="https://github.com/manuel-lohmus/browse-url">'browse-url'</a> module.</p>
 <h2 id="license">License</h2>
-<p><a href="LICENSE">MIT</a></p>
-<p>Copyright (c) 2021 Manuel Lõhmus <a href="mailto:manuel@hauss.ee">manuel@hauss.ee</a></p>
+<p>The MIT License <a href="LICENSE">MIT</a></p>
+<pre><code class="language-txt">Copyright (c) 2021 Manuel Lõhmus &lt;manuel@hauss.ee&gt;
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the &quot;Software&quot;), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+</code></pre>
 
 
 </body>

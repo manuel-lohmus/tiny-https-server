@@ -1,9 +1,11 @@
 /** Web server functions. @preserve Copyright (c) 2021 Manuel Lõhmus. */
 "use strict";
-var cs = require("config-sets");
-var options = cs.init({
+
+var hostname = require('os').hostname();
+var configSets = require('config-sets');
+var options = configSets.init({
     tiny_https_server: {
-        domain: "localhost",
+        domain: hostname,
         port: 80,
         logDir: "./log/tiny-https-server",
         document_root: "./public/www",
@@ -12,37 +14,41 @@ var options = cs.init({
         pathToPrivkey: "",
         pathToCert: "",
         subdomains: {},
-        cacheControl: {
-            fileTypes: {
-                webp: "max-age=2592000", //30 days
-                bmp: "max-age=2592000", //30 days
-                jpeg: "max-age=2592000", //30 days
-                jpg: "max-age=2592000", //30 days
-                png: "max-age=2592000", //30 days
-                svg: "max-age=2592000", //30 days
-                pdf: "max-age=2592000", //30 days
-
-                html: "max-age=86400", //1 days
-                css: "max-age=86400", //1 days
-                js: "max-age=86400", //1 days
-            }
-        },
+        cacheControl: {},
         setHeaders: {
             default: {},
             "/": { "X-Frame-Options": "DENY" }
-        }
+        },
+        service_worker_version: "1.0.0"
     }
 }).tiny_https_server;
+
+if (!options.cacheControl.fileTypes) {
+
+    options.cacheControl.fileTypes = {
+        webp: "max-age=2592000", //30 days
+        bmp: "max-age=2592000", //30 days
+        jpeg: "max-age=2592000", //30 days
+        jpg: "max-age=2592000", //30 days
+        png: "max-age=2592000", //30 days
+        svg: "max-age=2592000", //30 days
+        pdf: "max-age=2592000", //30 days
+        woff2: "max-age=2592000", //30 days
+        woff: "max-age=2592000", //30 days
+        "image/svg+xml": "max-age=2592000", //30 days
+
+        html: "max-age=86400", //1 days
+        css: "max-age=86400", //1 days
+        js: "max-age=86400", //1 days
+    };
+    configSets.init();
+}
+
 
 var fs = require("fs");
 var path = require("path");
 var zlib = require('zlib');
 var { pipeline } = require('stream');
-
-var localIP = '127.0.0.1';
-require('dns').lookup(require('os').hostname(), { family: 4 }, function (err, address, family) {
-    if (!err) { localIP = address; }
-})
 
 var http = require("http");
 var https = require("https");
@@ -66,7 +72,7 @@ if (isSSL) {
 
         res.on('close', function () { log(req, res); });
 
-        if (req.url.startsWith("/.well-known/acme-challenge/") && isValidatePath(req.url.substr(2))) {
+        if (req.url.startsWith("/.well-known/acme-challenge/") && isValidatePath(req.url.substring(2))) {
             // for .well-known/acme-challenge/
             static_request(req, res);
         }
@@ -138,15 +144,18 @@ server.emit = function (eventName, req, res) {
 server.listen(options.port, function (err) {
 
     if (err)
-        console.error(err);
-    else
-        console.log("Webserver port:" + options.port + " pid:" + process.pid);
+        console.error("[ ERROR ] 'tiny_https_server' " + err);
+    else if (configSets.isDebug)
+        console.log("[ DEBUG ] 'tiny_https_server' Webserver port:" + options.port + " pid:" + process.pid);
 });
 
 function log(req, res, prefix) {
 
     var date = new Date();
-    var fileName = path.resolve(process.cwd(), options.logDir, date.getUTCFullYear() + "-" + (date.getUTCMonth() + 1) + "-" + date.getUTCDate() + ".log");
+    var year = date.getFullYear();
+    var month = date.getMonth() + 1 < 10 ? `0${date.getMonth() + 1}` : date.getMonth() + 1;
+    var day = date.getDate() < 10 ? `0${date.getDate()}` : date.getDate();
+    var fileName = path.resolve(process.cwd(), options.logDir, year + "-" + month + "-" + day + ".log");
     var msg = prefix ? prefix + " " : "";
     // client address and port
     msg += req.client.remoteAddress + ":" + req.client.remotePort + " ";
@@ -171,7 +180,7 @@ function log(req, res, prefix) {
         fileName,
         msg,
         { flag: 'a+' },
-        function (err) { if (err) { console.error(err); } }
+        function (err) { if (err) { console.error("[ ERROR ] 'tiny_https_server' " + err); } }
     );
 }
 
@@ -183,29 +192,32 @@ function node_modules_request(req, res, next) {
 
     if (req.url.startsWith("/node_modules") && req.method.toLocaleUpperCase() === "GET") {
 
-        var filename = "";
-        var arrPath = req.url.split("/").filter(function (v) { return v; });
+        var filename = req.url.split("?").shift().split("/").filter(function (v) { return v; }).join("/");
 
-        if (arrPath.length === 2 && fs.existsSync(path.resolve(process.cwd(), arrPath.join("/")))) {
+        fs.readFile(path.join(process.cwd(), filename, "package.json"), function (err, data) {
 
-            var pk = require(arrPath[1] + "/package.json");
-            filename = path.join(process.cwd(), arrPath.join("/"), pk.browser || pk.main);
-        }
-        else {
-
-            filename = path.join(process.cwd(), arrPath.join("/"));
-        }
-
-        static_file(filename, res, function () {
-
-            filename = path.resolve(process.cwd(), options.document_root, options.pathToError_404);
-            static_file(filename, res, function (exists) {
-
-                if (!exists) {
-
-                    not_found_content(req, res);
+            if (!err) {
+                try {
+                    var pk = JSON.parse(data);
+                    filename = path.join(process.cwd(), filename, pk.browser || pk.main);
                 }
-            })
+                catch (e) { err = e; }
+            }
+
+            if (filename.endsWith("node_modules/tiny-https-server")) { filename = "browser.js" }
+            if (err) { filename = path.join(process.cwd(), filename); }
+
+            static_file(filename, res, function () {
+
+                filename = path.resolve(process.cwd(), options.document_root, options.pathToError_404);
+                static_file(filename, res, function (exists) {
+
+                    if (!exists) {
+
+                        not_found_content(req, res);
+                    }
+                })
+            });
         });
     }
     else
@@ -220,42 +232,11 @@ function static_request(req, res) {
     var filename = req.url.split("?").shift();
 
     if (!filename.length || filename.endsWith("/")) { filename += options.directory_index; }
-    if (filename.startsWith("/")) { filename = filename.substr(1); }
+    if (filename.startsWith("/")) { filename = filename.substring(1); }
 
-    var host = req.headers.host;
-    var document_root = "";
+    var { host, document_root } = get_document_root(req.headers.host);
 
-    // Excellent Default Domain
-    if (host === options.domain) {
-        document_root = options.document_root;
-    }
-    // Excellent
-    else if (options.subdomains[host]) {
-        document_root = options.subdomains[host].document_root;
-    }
-    else {
-        var objHost = parseHost(host);
-
-        // Default Domain
-        if (!objHost.subdomains.length && (objHost.domain === options.domain || objHost.domain === localIP)) {
-            document_root = options.document_root;
-            host = objHost.domain;
-        }
-        // Virtual Domain
-        else if (options.subdomains[objHost.hostname]) {
-            document_root = options.subdomains[objHost.hostname].document_root;
-            host = objHost.hostname;
-        }
-        // Subdomain
-        else if (options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]]) {
-            document_root = options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]].document_root;
-            host = objHost.subdomains[objHost.subdomains.length - 1];
-        }
-    }
-
-    if (document_root
-        && (req.method.toLocaleUpperCase() === "GET" || req.method.toLocaleUpperCase() === "HEAD")
-        && req.url.indexOf("?") === -1) {
+    if (document_root && (req.method.toLocaleUpperCase() === "GET" || req.method.toLocaleUpperCase() === "HEAD")) {
 
         filename = path.join(process.cwd(), document_root, filename);
 
@@ -276,6 +257,45 @@ function static_request(req, res) {
     }
 }
 /**
+ * @param {string} host
+ * @returns {{host:string,document_root:string}}
+ */
+function get_document_root(host) {
+
+    var document_root = "";
+
+    // Excellent Default Domain
+    if (host === options.domain) {
+        document_root = options.document_root;
+        host = "";
+    }
+    // Excellent
+    else if (options.subdomains[host]) {
+        document_root = options.subdomains[host].document_root;
+    }
+    else {
+        var objHost = parseHost(host);
+
+        // Virtual Domain
+        if (options.subdomains[objHost.hostname]) {
+            document_root = options.subdomains[objHost.hostname].document_root;
+            host = objHost.hostname;
+        }
+        // Subdomain
+        else if (options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]]) {
+            document_root = options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]].document_root;
+            host = objHost.subdomains[objHost.subdomains.length - 1];
+        }
+        // Default Domain
+        else {
+            document_root = options.document_root;
+            host = "";
+        }
+    }
+
+    return { host, document_root };
+}
+/**
  * @param {string} filename
  * @param {http.ServerResponse} res
  * @param {()void} callback
@@ -290,7 +310,7 @@ function static_file(filename, res, fn_not_found, subdomain) {
             // The best we can do is terminate the response immediately
             // and log the error.
             res.end();
-            console.error('An error occurred:', err);
+            console.error("[ ERROR ] 'tiny_https_server' An error occurred:", err);
         }
     }
 
@@ -301,7 +321,7 @@ function static_file(filename, res, fn_not_found, subdomain) {
             var url = res.req.url;
             var statusCode = filename.endsWith(path.parse(options.pathToError_404).base) ? 404 : 200;
             var acceptEncoding = res.req.headers['accept-encoding'] || "";
-            var cacheControl = options.cacheControl.fileTypes[path.extname(filename).substr(1)];
+            var cacheControl = options.cacheControl.fileTypes[path.extname(filename).substring(1)];
             var raw = fs.createReadStream(filename);
             var headers = res.headers || {};
 
@@ -353,8 +373,7 @@ function static_file(filename, res, fn_not_found, subdomain) {
                 pipeline(raw, res, onError);
             }
         }
-        else if (typeof fn_not_found === "function")
-            fn_not_found();
+        else if (typeof fn_not_found === "function") { fn_not_found(); }
     });
 }
 /**
@@ -363,8 +382,8 @@ function static_file(filename, res, fn_not_found, subdomain) {
  */
 function not_found_content(req, res, set_timeout) {
 
-    if (cs.isDebug) {
-        console.info("Warning: 404 Not Found", {
+    if (configSets.isDebug) {
+        console.warn("[ WARN ] 'tiny_https_server' 404 Not Found", {
             url: req.url,
             ip: req.socket.remoteAddress,
             userAgent: req.headers["user-agent"]
@@ -474,7 +493,7 @@ function isValidatePath(strPath) {
     if (strPath.indexOf('\0') !== -1) { return false; }
     if (strPath.indexOf('..') !== -1) { return false; }
     if (strPath.indexOf('/.') !== -1) { return false; }
-    if (strPath === '/') { return '\\'; }
+    //if (strPath === '/') { return '\\'; }
     //strPath = path.normalize(strPath);
     //strPath = strPath.replace(/^(\.\.(\/|\\|$))+/, '');
     //return strPath;
@@ -497,5 +516,97 @@ server.static_file = static_file;
 server.not_found_content = not_found_content;
 server.parseHost = parseHost;
 server.isSSL = isSSL;
-server.localIP = localIP;
 server.isValidatePath = isValidatePath;
+
+
+//*** Service Worker ***
+server.on("request", function (req, res, next) {
+    if (req.url === '/$service_worker_version') {
+        res.writeHead(200, { "Content-Type": "text/html; charset=UTF-8" });
+        configSets.reload();
+        res.end(options.service_worker_version);
+        return;
+    }
+    if (req.url === '/service_worker.js') {
+        res.writeHead(200, { "Content-Type": "text/javascript; charset=UTF-8" });
+        res.end(getServiceWorkerCode(get_document_root(req.headers.host).document_root));
+        return;
+    }
+    next();
+});
+function getServiceWorkerCode(document_root) {
+    return `'use strict';
+
+var RUNTIME = 'runtime@${options.service_worker_version}';
+var PRECACHE = 'conextra@${options.service_worker_version}';
+var PRECACHE_URLS = ${getCachingFilesToString(document_root)};
+
+self.addEventListener('install', (event) => {
+	event.waitUntil(
+		caches.open(PRECACHE)
+			.then(function (cache) {
+				cache.addAll(PRECACHE_URLS.map(function (url) {
+					return new Request(url, { cache: 'no-cache' });
+				}));
+			})
+			.then(self.skipWaiting())
+	);
+});
+self.addEventListener('activate', event => {
+	var currentCaches = [PRECACHE, RUNTIME];
+	event.waitUntil(
+		caches.keys().then(cacheNames => {
+			return cacheNames.filter(cacheName => !currentCaches.includes(cacheName));
+		}).then(cachesToDelete => {
+			return Promise.all(cachesToDelete.map(cacheToDelete => {
+				return caches.delete(cacheToDelete);
+			}));
+		}).then(() => self.clients.claim())
+	);
+});
+self.addEventListener('fetch', function (event) {
+	if (event.request.url.startsWith(self.location.origin)) {
+		event.respondWith(
+			caches.match(event.request).then(cachedResponse => {
+				if (event.request.url.includes("/$")) {
+					return fetch(new Request(event.request.url, { cache: 'no-cache' }));
+				}
+				if (cachedResponse) {
+					return cachedResponse;
+				}
+				return caches.open(RUNTIME).then(cache => {
+					return fetch(new Request(event.request.url, { cache: 'no-cache' })).then(response => {
+						return cache.put(event.request, response.clone()).then(() => {
+							return response;
+						});
+					});
+				});
+			})
+		);
+	}
+});`;
+}
+function getCachingFilesToString(document_root) {
+
+    /** @param {string} fsPath @returns {[string]} */
+    function _getFiles(fsPath) {
+
+        if (!fs.lstatSync(fsPath).isDirectory()) { return [fsPath]; }
+
+        return fs.readdirSync(fsPath).reduce(function (filesPath, name) {
+            if (name.startsWith('.')) { return filesPath; }
+            if (options.pathToError_404.includes(name)) { return filesPath; }
+            return filesPath.concat(_getFiles(`${fsPath}/${name}`));
+        }, []);
+
+    }
+
+    return `[${_getFiles(document_root)
+        .map(function (fsPath) {
+            return '\r\n\t"'
+                + fsPath.replace(document_root, '')
+                + '"';
+        })
+        .join(',')}
+]`;
+}

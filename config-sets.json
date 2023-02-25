@@ -1,40 +1,5 @@
 {
   "production": {
-    "tiny_https_server": {
-      "domain": "localhost",
-      "port": 443,
-      "logDir": "./log/tiny-https-server",
-      "document_root": "./public/www",
-      "directory_index": "index.html",
-      "pathToError_404": "./error_404.html",
-      "pathToPrivkey": "./cert/localhost-key.pem",
-      "pathToCert": "./cert/localhost-cert.pem",
-      "subdomains": {
-        "test": {
-          "document_root": "./public/test"
-        }
-      },
-      "cacheControl": {
-        "fileTypes": {
-          "bmp": "max-age=2592000",
-          "jpeg": "max-age=2592000",
-          "jpg": "max-age=2592000",
-          "png": "max-age=2592000",
-          "svg": "max-age=2592000",
-          "pdf": "max-age=2592000",
-          "html": "max-age=86400",
-          "css": "max-age=86400",
-          "js": "max-age=86400",
-          "webp": "max-age=2592000"
-        }
-      },
-      "setHeaders": {
-        "default": {},
-        "/": {
-          "X-Frame-Options": "DENY"
-        }
-      }
-    },
     "log_report": {
       "logDir": "./log/log-report",
       "enabled": true,
@@ -43,21 +8,53 @@
     },
     "browse_url": {
       "launch_url": "",
-      "enabled": true
+      "enabled": false
     },
     "try_to_run": {
       "retrying": 10,
-      "enabled": false
-    }
-  },
-  "development": {
+      "enabled": true
+    },
     "tiny_https_server": {
+      "domain": "localhost",
+      "port": 80,
+      "logDir": "./log/tiny-https-server",
+      "document_root": "./public/www",
+      "directory_index": "index.html",
+      "pathToError_404": "./error_404.html",
+      "pathToPrivkey": "",
+      "pathToCert": "",
       "subdomains": {
         "test": {
           "document_root": "./public/test"
         }
-      }
-    },
+      },
+      "cacheControl": {
+        "fileTypes": {
+          "webp": "max-age=2592000",
+          "bmp": "max-age=2592000",
+          "jpeg": "max-age=2592000",
+          "jpg": "max-age=2592000",
+          "png": "max-age=2592000",
+          "svg": "max-age=2592000",
+          "pdf": "max-age=2592000",
+          "woff2": "max-age=2592000",
+          "woff": "max-age=2592000",
+          "image/svg+xml": "max-age=2592000",
+          "html": "max-age=86400",
+          "css": "max-age=86400",
+          "js": "max-age=86400"
+        }
+      },
+      "setHeaders": {
+        "default": {},
+        "/": {
+          "X-Frame-Options": "DENY"
+        }
+      },
+      "service_worker_version": "1.0.0"
+    }
+  },
+  "development": {
     "log_report": {
       "logDir": "./log/log-report",
       "enabled": true,
@@ -67,6 +64,16 @@
     "browse_url": {
       "launch_url": "https://localhost/",
       "enabled": true
+    },
+    "try_to_run": {
+      "enabled": false
+    },
+    "tiny_https_server": {
+      "subdomains": {
+        "test": {
+          "document_root": "./public/test"
+        }
+      }
     }
   }
 }
