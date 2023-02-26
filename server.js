@@ -192,7 +192,10 @@ function node_modules_request(req, res, next) {
 
     if (req.url.startsWith("/node_modules") && req.method.toLocaleUpperCase() === "GET") {
 
-        var filename = req.url.split("?").shift().split("/").filter(function (v) { return v; }).join("/");
+        var filename = req.url.split("?").shift().split("/")
+            .filter(function (v) { return v; })
+            .map(function (v) { return v.split("@").shift(); })
+            .join("/");
 
         fs.readFile(path.join(process.cwd(), filename, "package.json"), function (err, data) {
 
@@ -529,16 +532,16 @@ server.on("request", function (req, res, next) {
     }
     if (req.url === '/service_worker.js') {
         res.writeHead(200, { "Content-Type": "text/javascript; charset=UTF-8" });
-        res.end(getServiceWorkerCode(get_document_root(req.headers.host).document_root));
+        res.end(getServiceWorkerCode(req.headers.host, get_document_root(req.headers.host).document_root));
         return;
     }
     next();
 });
-function getServiceWorkerCode(document_root) {
+function getServiceWorkerCode(host, document_root) {
     return `'use strict';
 
 var RUNTIME = 'runtime@${options.service_worker_version}';
-var PRECACHE = 'conextra@${options.service_worker_version}';
+var PRECACHE = '${host}@${options.service_worker_version}';
 var PRECACHE_URLS = ${getCachingFilesToString(document_root)};
 
 self.addEventListener('install', (event) => {
@@ -580,8 +583,13 @@ self.addEventListener('fetch', function (event) {
 				}
 				return caches.open(RUNTIME).then(cache => {
 					return fetch(new Request(url, { cache: 'no-cache' })).catch((err) => {
+                        // Not found resource in 'https://cdn.jsdelivr.net/npm/'
+                        console.error(err);
 						return fetch(new Request(event.request.url, { cache: 'no-cache' })).then(response => {
-							return cache.put(event.request, response.clone()).then(() => {
+							return cache.put(event.request, response.clone()).catch((err) => {
+                                // Not found resource in '/node_modules/'
+                                console.error(err);
+                            }).then(() => {
 								return response;
 							});
 						});
@@ -610,7 +618,7 @@ function getCachingFilesToString(document_root) {
         }, []);
 
     }
-
+    
     return `[${_getFiles(document_root)
         .map(function (fsPath) {
             return '\r\n\t"'

@@ -3,6 +3,7 @@
 [![npm-version](https://badgen.net/npm/v/tiny-https-server)](https://www.npmjs.com/package/tiny-https-server)
 [![npm-total-downloads](https://badgen.net/npm/dt/tiny-https-server)](https://www.npmjs.com/package/tiny-https-server)
 [![npm-week-downloads](https://badgen.net/npm/dw/tiny-https-server)](https://www.npmjs.com/package/tiny-https-server)
+[![](https://data.jsdelivr.com/v1/package/npm/tiny-https-server/badge)](https://www.jsdelivr.com/package/npm/tiny-https-server)
 
 Easy tiny https web server middleware.
 Easy to use and configure.
