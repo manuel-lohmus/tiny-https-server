@@ -550,7 +550,7 @@ function getServiceWorkerCode(settings) {
     return `'use strict';
 
 var RUNTIME = 'runtime@${settings.service_worker_version}';
-var PRECACHE = '${settings.host}@${settings.service_worker_version}';
+var PRECACHE = '${settings.host || "localhost"}@${settings.service_worker_version}';
 var PRECACHE_URLS = ${getCachingFilesToString(settings.document_root)};
 
 self.addEventListener('install', (event) => {
@@ -591,21 +591,20 @@ self.addEventListener('fetch', function (event) {
 					return cachedResponse;
 				}
 				return caches.open(RUNTIME).then(cache => {
-					return fetch(new Request(url, { cache: 'no-cache' })).catch((err) => {
-                        // Not found resource in 'https://cdn.jsdelivr.net/npm/'
-                        console.error(err);
-						return fetch(new Request(event.request.url, { cache: 'no-cache' })).then(response => {
-							return cache.put(event.request, response.clone()).catch((err) => {
-                                // Not found resource in '/node_modules/'
-                                console.error(err);
-                            }).then(() => {
+					return fetch(new Request(url, { cache: 'no-cache' })).then(response => {
+						if (response.status === 200) {
+							return cache.put(event.request, response.clone()).then(() => {
 								return response;
 							});
-						});
-					}).then(response => {
-						return cache.put(event.request, response.clone()).then(() => {
-							return response;
-						});
+						}
+						else {
+							console.warn("Not found resource in", url);
+							return fetch(new Request(event.request.url, { cache: 'no-cache' })).then(response => {
+								return cache.put(event.request, response.clone()).then(() => {
+									return response;
+								});
+							});
+						}
 					});
 				});
 			})
