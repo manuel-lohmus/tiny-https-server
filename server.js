@@ -566,6 +566,10 @@ self.addEventListener('activate', event => {
 });
 self.addEventListener('fetch', function (event) {
 	if (event.request.url.startsWith(self.location.origin)) {
+		var url = event.request.url;
+		if (url.includes("/node_modules/")) {
+			url = "https://cdn.jsdelivr.net/npm/" + url.split("/node_modules/").pop();
+		}
 		event.respondWith(
 			caches.match(event.request).then(cachedResponse => {
 				if (event.request.url.includes("/$")) {
@@ -575,7 +579,13 @@ self.addEventListener('fetch', function (event) {
 					return cachedResponse;
 				}
 				return caches.open(RUNTIME).then(cache => {
-					return fetch(new Request(event.request.url, { cache: 'no-cache' })).then(response => {
+					return fetch(new Request(url, { cache: 'no-cache' })).catch((err) => {
+						return fetch(new Request(event.request.url, { cache: 'no-cache' })).then(response => {
+							return cache.put(event.request, response.clone()).then(() => {
+								return response;
+							});
+						});
+					}).then(response => {
 						return cache.put(event.request, response.clone()).then(() => {
 							return response;
 						});

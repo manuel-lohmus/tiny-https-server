@@ -12,7 +12,11 @@
     "static",
     "subdomain",
     "middleware",
-    "fast"
+    "fast",
+    "sw",
+    "service-worker",
+    "pwa",
+    "cdn"
   ],
   "main": "server.js",
   "browser": "browser.js",
