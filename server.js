@@ -19,7 +19,7 @@ var options = configSets.init({
             default: {},
             "/": { "X-Frame-Options": "DENY" }
         },
-        service_worker_version: "1.0.0"
+        service_worker_version: "0.0.0"
     }
 }).tiny_https_server;
 
@@ -41,7 +41,7 @@ if (!options.cacheControl.fileTypes) {
         css: "max-age=86400", //1 days
         js: "max-age=86400", //1 days
     };
-    configSets.init();
+    configSets.save();
 }
 
 
@@ -237,7 +237,7 @@ function static_request(req, res) {
     if (!filename.length || filename.endsWith("/")) { filename += options.directory_index; }
     if (filename.startsWith("/")) { filename = filename.substring(1); }
 
-    var { host, document_root } = get_document_root(req.headers.host);
+    var { host, document_root } = get_host_settings(req.headers.host);
 
     if (document_root && (req.method.toLocaleUpperCase() === "GET" || req.method.toLocaleUpperCase() === "HEAD")) {
 
@@ -263,40 +263,49 @@ function static_request(req, res) {
  * @param {string} host
  * @returns {{host:string,document_root:string}}
  */
-function get_document_root(host) {
+function get_host_settings(host) {
 
-    var document_root = "";
+    var document_root = "", service_worker_version = "0.0.0";
 
     // Excellent Default Domain
     if (host === options.domain) {
-        document_root = options.document_root;
         host = "";
     }
     // Excellent
     else if (options.subdomains[host]) {
-        document_root = options.subdomains[host].document_root;
+        //host = host;
     }
     else {
         var objHost = parseHost(host);
 
         // Virtual Domain
         if (options.subdomains[objHost.hostname]) {
-            document_root = options.subdomains[objHost.hostname].document_root;
             host = objHost.hostname;
         }
         // Subdomain
         else if (options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]]) {
-            document_root = options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]].document_root;
             host = objHost.subdomains[objHost.subdomains.length - 1];
         }
         // Default Domain
         else {
-            document_root = options.document_root;
             host = "";
         }
     }
 
-    return { host, document_root };
+    if (host) {
+        document_root = options.subdomains[host].document_root;
+        if (!options.subdomains[host].service_worker_version) {
+            options.subdomains[host].service_worker_version = service_worker_version;
+            configSets.save();
+        }
+        service_worker_version = options.subdomains[host].service_worker_version;
+    }
+    else {
+        document_root = options.document_root;
+        service_worker_version = options.service_worker_version;
+    }
+
+    return { host, document_root, service_worker_version };
 }
 /**
  * @param {string} filename
@@ -527,22 +536,22 @@ server.on("request", function (req, res, next) {
     if (req.url === '/$service_worker_version') {
         res.writeHead(200, { "Content-Type": "text/html; charset=UTF-8" });
         configSets.reload();
-        res.end(options.service_worker_version);
+        res.end(get_host_settings(req.headers.host).service_worker_version);
         return;
     }
     if (req.url === '/service_worker.js') {
         res.writeHead(200, { "Content-Type": "text/javascript; charset=UTF-8" });
-        res.end(getServiceWorkerCode(req.headers.host, get_document_root(req.headers.host).document_root));
+        res.end(getServiceWorkerCode(get_host_settings(req.headers.host)));
         return;
     }
     next();
 });
-function getServiceWorkerCode(host, document_root) {
+function getServiceWorkerCode(settings) {
     return `'use strict';
 
-var RUNTIME = 'runtime@${options.service_worker_version}';
-var PRECACHE = '${host}@${options.service_worker_version}';
-var PRECACHE_URLS = ${getCachingFilesToString(document_root)};
+var RUNTIME = 'runtime@${settings.service_worker_version}';
+var PRECACHE = '${settings.host}@${settings.service_worker_version}';
+var PRECACHE_URLS = ${getCachingFilesToString(settings.document_root)};
 
 self.addEventListener('install', (event) => {
 	event.waitUntil(
@@ -618,7 +627,7 @@ function getCachingFilesToString(document_root) {
         }, []);
 
     }
-    
+
     return `[${_getFiles(document_root)
         .map(function (fsPath) {
             return '\r\n\t"'
