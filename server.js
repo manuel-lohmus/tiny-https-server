@@ -232,14 +232,32 @@ function node_modules_request(req, res, next) {
  */
 function static_request(req, res) {
 
-    var filename = req.url.split("?").shift();
+    var { host, document_root, service_worker_version } = get_host_settings(req.headers.host);
 
-    if (!filename.length || filename.endsWith("/")) { filename += options.directory_index; }
-    if (filename.startsWith("/")) { filename = filename.substring(1); }
+    //*** Service Worker Version ***
+    if (req.url === '/$service_worker_version' && (!host || options.subdomains[host])) {
 
-    var { host, document_root } = get_host_settings(req.headers.host);
+        res.writeHead(200, { "Content-Type": "text/html; charset=UTF-8" });
+        configSets.reload();
+        res.end(service_worker_version);
 
+        return;
+    }
+    //*** Service Worker Strict ***
+    if (req.url === '/service_worker.js' && (!host || options.subdomains[host])) {
+
+        res.writeHead(200, { "Content-Type": "text/javascript; charset=UTF-8" });
+        res.end(getServiceWorkerCode({ host, document_root, service_worker_version }));
+
+        return;
+    }
+    //*** Static File ***
     if (document_root && (req.method.toLocaleUpperCase() === "GET" || req.method.toLocaleUpperCase() === "HEAD")) {
+
+        var filename = req.url.split("?").shift();
+
+        if (!filename.length || filename.endsWith("/")) { filename += options.directory_index; }
+        if (filename.startsWith("/")) { filename = filename.substring(1); }
 
         filename = path.join(process.cwd(), document_root, filename);
 
@@ -254,10 +272,11 @@ function static_request(req, res) {
                 }
             })
         }, host);
+
+        return;
     }
-    else {
-        not_found_content(req, res, 3000);
-    }
+
+    not_found_content(req, res, 3000);
 }
 /**
  * @param {string} host
@@ -532,20 +551,6 @@ server.isValidatePath = isValidatePath;
 
 
 //*** Service Worker ***
-server.on("request", function (req, res, next) {
-    if (req.url === '/$service_worker_version') {
-        res.writeHead(200, { "Content-Type": "text/html; charset=UTF-8" });
-        configSets.reload();
-        res.end(get_host_settings(req.headers.host).service_worker_version);
-        return;
-    }
-    if (req.url === '/service_worker.js') {
-        res.writeHead(200, { "Content-Type": "text/javascript; charset=UTF-8" });
-        res.end(getServiceWorkerCode(get_host_settings(req.headers.host)));
-        return;
-    }
-    next();
-});
 function getServiceWorkerCode(settings) {
     return `'use strict';
 
