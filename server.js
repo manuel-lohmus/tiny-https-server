@@ -565,7 +565,7 @@ self.addEventListener('install', (event) => {
 				PRECACHE_URLS.forEach(function (url) {
 					fetch(new Request(url, { cache: 'no-cache' }))
 						.then((response) => {
-							if (response.ok) {
+							if (response.status === 200) {
 								return cache.put(url, response);
 							}
 						});
@@ -602,7 +602,7 @@ self.addEventListener('fetch', function (event) {
 				}
 				return caches.open(RUNTIME).then(cache => {
 					return fetch(new Request(url, { cache: 'no-cache' })).then(response => {
-						if (response.ok) {
+						if (response.status === 200) {
 							return cache.put(event.request, response.clone()).then(() => {
 								return response;
 							});
@@ -610,7 +610,7 @@ self.addEventListener('fetch', function (event) {
 						else {
 							console.warn("Not found resource in", url);
 							return fetch(new Request(event.request.url, { cache: 'no-cache' })).then(response => {
-								if (!response.ok) { return response; }
+								if (response.status !== 200) { return response; }
 								return cache.put(event.request, response.clone()).then(() => {
 									return response;
 								});
