@@ -341,7 +341,7 @@ function static_file(filename, res, fn_not_found, subdomain) {
             // The best we can do is terminate the response immediately
             // and log the error.
             res.end();
-            console.error("[ ERROR ] 'tiny_https_server' An error occurred:", err);
+            if (configSets.isDebug) console.error("[ ERROR ] 'tiny_https_server' An error occurred:", err);
         }
     }
 
@@ -605,6 +605,7 @@ self.addEventListener('fetch', function (event) {
 						else {
 							console.warn("Not found resource in", url);
 							return fetch(new Request(event.request.url, { cache: 'no-cache' })).then(response => {
+                                if (response.status !== 200) { return response; }
 								return cache.put(event.request, response.clone()).then(() => {
 									return response;
 								});
