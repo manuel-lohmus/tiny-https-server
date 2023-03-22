@@ -562,9 +562,14 @@ self.addEventListener('install', (event) => {
 	event.waitUntil(
 		caches.open(PRECACHE)
 			.then(function (cache) {
-				cache.addAll(PRECACHE_URLS.map(function (url) {
-					return new Request(url, { cache: 'no-cache' });
-				}));
+				PRECACHE_URLS.forEach(function (url) {
+					fetch(new Request(url, { cache: 'no-cache' }))
+						.then((response) => {
+							if (response.ok) {
+								return cache.put(url, response);
+							}
+						});
+				});
 			})
 			.then(self.skipWaiting())
 	);
@@ -597,7 +602,7 @@ self.addEventListener('fetch', function (event) {
 				}
 				return caches.open(RUNTIME).then(cache => {
 					return fetch(new Request(url, { cache: 'no-cache' })).then(response => {
-						if (response.status === 200) {
+						if (response.ok) {
 							return cache.put(event.request, response.clone()).then(() => {
 								return response;
 							});
@@ -605,7 +610,7 @@ self.addEventListener('fetch', function (event) {
 						else {
 							console.warn("Not found resource in", url);
 							return fetch(new Request(event.request.url, { cache: 'no-cache' })).then(response => {
-                                if (response.status !== 200) { return response; }
+								if (!response.ok) { return response; }
 								return cache.put(event.request, response.clone()).then(() => {
 									return response;
 								});
