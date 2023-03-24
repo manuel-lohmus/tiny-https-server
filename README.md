@@ -80,7 +80,10 @@ Set the current 'service_worker_version' in the config-sets.json file.
 {
   "production": {
     "tiny_https_server": {
-      "service_worker_version": "1.0.0"
+      "service_worker_version": "1.0.0",
+      "content_delivery_network_url": "",       /***** "" | "https://cdn.jsdelivr.net/npm/" *****/
+      "content_delivery_network_root": "",      /***** "" | "npm_name/www" *****/
+      "precache_urls": null                     /***** null | [] | ["/index.html, ..."] *****/
     }
   }
 }
@@ -160,7 +163,10 @@ config-sets.json [*Read more...*](https://github.com/manuel-lohmus/config-sets)
           "X-Frame-Options": "DENY"
         }
       },
-      "service_worker_version": "1.0.0"
+      "service_worker_version": "1.0.0",
+      "content_delivery_network_url": "https://cdn.jsdelivr.net/npm/",
+      "content_delivery_network_root": "",
+      "precache_urls": null
     }
   },
   "development": {

@@ -654,8 +654,8 @@ function get_CDN(cache, url) {
 function get_CDN_url(url) {
 	url = (url + "").split("#").shift().split("?").shift();
 	if (url.endsWith("/") || url.endsWith("html")) { return url; }
-	if (url.startsWith("http")) { url = (new URL(url)).pathname; }
     if ("${settings.content_delivery_network_url}") {
+        if (url.startsWith("http")) { url = (new URL(url)).pathname; }
 		if (url.includes("/node_modules/")) {
 			url = "${settings.content_delivery_network_url}" + url.split("/node_modules/").pop();
 		}
