@@ -19,7 +19,10 @@ var options = configSets.init({
             default: {},
             "/": { "X-Frame-Options": "DENY" }
         },
-        service_worker_version: "0.0.0"
+        service_worker_version: "0.0.0",
+        content_delivery_network_url: "https://cdn.jsdelivr.net/npm/",
+        content_delivery_network_root: "",
+        precache_urls: null
     }
 }).tiny_https_server;
 
@@ -232,7 +235,7 @@ function node_modules_request(req, res, next) {
  */
 function static_request(req, res) {
 
-    var { host, document_root, service_worker_version } = get_host_settings(req.headers.host);
+    var { host, document_root, service_worker_version, content_delivery_network_url, content_delivery_network_root, precache_urls } = get_host_settings(req.headers.host);
 
     //*** Service Worker Version ***
     if (req.url === '/$service_worker_version' && (!host || options.subdomains[host])) {
@@ -247,7 +250,7 @@ function static_request(req, res) {
     if (req.url === '/service_worker.js' && (!host || options.subdomains[host])) {
 
         res.writeHead(200, { "Content-Type": "text/javascript; charset=UTF-8" });
-        res.end(getServiceWorkerCode({ host, document_root, service_worker_version }));
+        res.end(getServiceWorkerCode({ host, document_root, service_worker_version, content_delivery_network_url, content_delivery_network_root, precache_urls }));
 
         return;
     }
@@ -284,7 +287,11 @@ function static_request(req, res) {
  */
 function get_host_settings(host) {
 
-    var document_root = "", service_worker_version = "0.0.0";
+    var document_root = "",
+        service_worker_version = "0.0.0",
+        content_delivery_network_url = "",
+        content_delivery_network_root = "",
+        precache_urls = null;
 
     // Excellent Default Domain
     if (host === options.domain) {
@@ -313,18 +320,43 @@ function get_host_settings(host) {
 
     if (host) {
         document_root = options.subdomains[host].document_root;
+
         if (!options.subdomains[host].service_worker_version) {
             options.subdomains[host].service_worker_version = service_worker_version;
             configSets.save();
         }
         service_worker_version = options.subdomains[host].service_worker_version;
+
+        if (!options.subdomains[host].content_delivery_network_url) {
+            options.subdomains[host].content_delivery_network_url = content_delivery_network_url;
+            configSets.save();
+        }
+        content_delivery_network_url = options.subdomains[host].content_delivery_network_url;
+
+        if (!options.subdomains[host].content_delivery_network_root) {
+            options.subdomains[host].content_delivery_network_root = content_delivery_network_root;
+            configSets.save();
+        }
+        content_delivery_network_root = options.subdomains[host].content_delivery_network_root;
+
+        if (!options.subdomains[host].precache_urls) {
+            options.subdomains[host].precache_urls = precache_urls;
+            configSets.save();
+        }
+        precache_urls = options.subdomains[host].precache_urls;
     }
     else {
         document_root = options.document_root;
         service_worker_version = options.service_worker_version;
+        content_delivery_network_url = options.content_delivery_network_url;
+        content_delivery_network_root = options.content_delivery_network_root;
+        precache_urls = options.precache_urls;
     }
 
-    return { host, document_root, service_worker_version };
+    if (content_delivery_network_url && !content_delivery_network_url.endsWith("/")) { content_delivery_network_url += "/"; }
+    if (content_delivery_network_root && content_delivery_network_root.endsWith("/")) { content_delivery_network_root = content_delivery_network_root.slice(0, -1); }
+
+    return { host, document_root, service_worker_version, content_delivery_network_url, content_delivery_network_root, precache_urls };
 }
 /**
  * @param {string} filename
@@ -556,19 +588,14 @@ function getServiceWorkerCode(settings) {
 
 var RUNTIME = 'runtime@${settings.service_worker_version}';
 var PRECACHE = '${settings.host || "localhost"}@${settings.service_worker_version}';
-var PRECACHE_URLS = ${getCachingFilesToString(settings.document_root)};
+var PRECACHE_URLS = ${getCachingFilesToString(settings.precache_urls || settings.document_root)};
 
 self.addEventListener('install', (event) => {
 	event.waitUntil(
 		caches.open(PRECACHE)
 			.then(function (cache) {
 				PRECACHE_URLS.forEach(function (url) {
-					fetch(new Request(url, { cache: 'no-cache' }))
-						.then((response) => {
-							if (response.status === 200) {
-								return cache.put(url, response);
-							}
-						});
+					return get_CDN(cache, url);
 				});
 			})
 			.then(self.skipWaiting())
@@ -588,10 +615,6 @@ self.addEventListener('activate', event => {
 });
 self.addEventListener('fetch', function (event) {
 	if (event.request.url.startsWith(self.location.origin)) {
-		var url = event.request.url;
-		if (url.includes("/node_modules/")) {
-			url = "https://cdn.jsdelivr.net/npm/" + url.split("/node_modules/").pop();
-		}
 		event.respondWith(
 			caches.match(event.request).then(cachedResponse => {
 				if (event.request.url.includes("/$")) {
@@ -601,29 +624,60 @@ self.addEventListener('fetch', function (event) {
 					return cachedResponse;
 				}
 				return caches.open(RUNTIME).then(cache => {
-					return fetch(new Request(url, { cache: 'no-cache' })).then(response => {
-						if (response.status === 200) {
-							return cache.put(event.request, response.clone()).then(() => {
-								return response;
-							});
-						}
-						else {
-							console.warn("Not found resource in", url);
-							return fetch(new Request(event.request.url, { cache: 'no-cache' })).then(response => {
-								if (response.status !== 200) { return response; }
-								return cache.put(event.request, response.clone()).then(() => {
-									return response;
-								});
-							});
-						}
-					});
+					return get_CDN(cache, event.request.url);
 				});
 			})
 		);
 	}
-});`;
+});
+function get_CDN(cache, url) {
+
+	var CDN_url = get_CDN_url(url);
+
+	return fetch(new Request(CDN_url, { cache: 'no-cache' })).then(response => {
+		if (response.status === 200) {
+			return cache.put(url, response.clone()).then(() => {
+				return response;
+			});
+		}
+		else {
+			console.warn("Not found resource in", CDN_url);
+			return fetch(new Request(url, { cache: 'no-cache' })).then(response => {
+				if (response.status !== 200) { return response; }
+				return cache.put(url, response.clone()).then(() => {
+					return response;
+				});
+			});
+		}
+	});
+}
+function get_CDN_url(url) {
+	url = (url + "").split("#").shift().split("?").shift();
+	if (url.endsWith("/") || url.endsWith("html")) { return url; }
+	if (url.startsWith("http")) { url = (new URL(url)).pathname; }
+    if ("${settings.content_delivery_network_url}") {
+		if (url.includes("/node_modules/")) {
+			url = "${settings.content_delivery_network_url}" + url.split("/node_modules/").pop();
+		}
+        else if ("${settings.content_delivery_network_root}") {
+            url = "${settings.content_delivery_network_url}" + "${settings.content_delivery_network_root}" + url;
+        }
+    }
+	return url;
+}`;
 }
 function getCachingFilesToString(document_root) {
+
+    if (Array.isArray(document_root)) {
+        return `[${document_root
+            .map(function (fsPath) {
+                return '\r\n\t"'
+                    + fsPath
+                    + '"';
+            })
+            .join(',')}
+]`;
+    }
 
     /** @param {string} fsPath @returns {[string]} */
     function _getFiles(fsPath) {
