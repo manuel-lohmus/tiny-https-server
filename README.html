@@ -100,24 +100,26 @@ Set the current 'service_worker_version' in the config-sets.json file.</p>
 </code></pre>
 <p>Start a <code>/$</code> url that bypasses the Service Worker cache.<br />
 For example <code>/$service_worker_version</code>.</p>
-<h2 id="config-sets-file">Config-sets file</h2>
-<p>config-sets.json <a href="https://github.com/manuel-lohmus/config-sets"><em>Read more...</em></a></p>
+<h2 id="add-a-subdomain">Add a subdomain</h2>
 <pre><code class="language-json">{
   &quot;production&quot;: {
-    &quot;log_report&quot;: {
-      &quot;logDir&quot;: &quot;./log/log-report&quot;,
-      &quot;enabled&quot;: true,
-      &quot;clear_on_startup&quot;: false,
-      &quot;save_only_uncaughtException&quot;: true
-    },
-    &quot;browse_url&quot;: {
-      &quot;launch_url&quot;: &quot;&quot;,
-      &quot;enabled&quot;: false
-    },
-    &quot;try_to_run&quot;: {
-      &quot;retrying&quot;: 10,
-      &quot;enabled&quot;: true
-    },
+    &quot;tiny_https_server&quot;: {
+      &quot;subdomains&quot;: {
+        &quot;www&quot;: {
+          &quot;document_root&quot;: &quot;./public/www&quot;,
+          &quot;service_worker_version&quot;: &quot;0.0.0&quot;,
+          &quot;content_delivery_network_url&quot;: &quot;&quot;,
+          &quot;content_delivery_network_root&quot;: &quot;&quot;,
+          &quot;precache_urls&quot;: null
+        }
+      }
+    }
+  }
+}
+</code></pre>
+<h2 id="config-sets-file">Config-sets file</h2>
+<p>config-sets.json <a href="https://github.com/manuel-lohmus/config-sets"><em>Read more...</em></a></p>
+<pre><code class="language-json{">  &quot;production&quot;: {
     &quot;tiny_https_server&quot;: {
       &quot;domain&quot;: &quot;localhost&quot;,
       &quot;port&quot;: 443,
@@ -128,8 +130,12 @@ For example <code>/$service_worker_version</code>.</p>
       &quot;pathToPrivkey&quot;: &quot;./cert/localhost-key.pem&quot;,
       &quot;pathToCert&quot;: &quot;./cert/localhost-cert.pem&quot;,
       &quot;subdomains&quot;: {
-        &quot;test&quot;: {
-          &quot;document_root&quot;: &quot;./public/test&quot;
+        &quot;www&quot;: {
+          &quot;document_root&quot;: &quot;./public/www&quot;,
+          &quot;service_worker_version&quot;: &quot;1.0.0&quot;,
+          &quot;content_delivery_network_url&quot;: &quot;&quot;,
+          &quot;content_delivery_network_root&quot;: &quot;&quot;,
+          &quot;precache_urls&quot;: null
         }
       },
       &quot;cacheControl&quot;: {
@@ -156,12 +162,37 @@ For example <code>/$service_worker_version</code>.</p>
         }
       },
       &quot;service_worker_version&quot;: &quot;1.0.0&quot;,
-      &quot;content_delivery_network_url&quot;: &quot;https://cdn.jsdelivr.net/npm/&quot;,
+      &quot;content_delivery_network_url&quot;: &quot;&quot;,
       &quot;content_delivery_network_root&quot;: &quot;&quot;,
       &quot;precache_urls&quot;: null
+    },
+    &quot;try_to_run&quot;: {
+      &quot;retrying&quot;: 10,
+      &quot;enabled&quot;: true
+    },
+    &quot;log_report&quot;: {
+      &quot;logDir&quot;: &quot;./log/log-report&quot;,
+      &quot;enabled&quot;: true,
+      &quot;clear_on_startup&quot;: false,
+      &quot;save_only_uncaughtException&quot;: true
+    },
+    &quot;browse_url&quot;: {
+      &quot;launch_url&quot;: &quot;&quot;,
+      &quot;enabled&quot;: true
     }
   },
   &quot;development&quot;: {
+    &quot;tiny_https_server&quot;: {
+      &quot;port&quot;: 80,
+      &quot;subdomains&quot;: {
+        &quot;test&quot;: {
+          &quot;document_root&quot;: &quot;./public/test&quot;
+        }
+      }
+    },
+    &quot;try_to_run&quot;: {
+      &quot;enabled&quot;: false
+    },
     &quot;log_report&quot;: {
       &quot;logDir&quot;: &quot;./log/log-report&quot;,
       &quot;enabled&quot;: true,
@@ -171,16 +202,6 @@ For example <code>/$service_worker_version</code>.</p>
     &quot;browse_url&quot;: {
       &quot;launch_url&quot;: &quot;https://localhost/&quot;,
       &quot;enabled&quot;: true
-    },
-    &quot;try_to_run&quot;: {
-      &quot;enabled&quot;: false
-    },
-    &quot;tiny_https_server&quot;: {
-      &quot;subdomains&quot;: {
-        &quot;test&quot;: {
-          &quot;document_root&quot;: &quot;./public/test&quot;
-        }
-      }
     }
   }
 }

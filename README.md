@@ -106,26 +106,31 @@ Add to the webpage [Service Worker Script](browser.js)
 Start a `/$` url that bypasses the Service Worker cache.\
 For example `/$service_worker_version`.
 
-## Config-sets file
+## Add a subdomain
 
-config-sets.json [*Read more...*](https://github.com/manuel-lohmus/config-sets)
 ```json
 {
   "production": {
-    "log_report": {
-      "logDir": "./log/log-report",
-      "enabled": true,
-      "clear_on_startup": false,
-      "save_only_uncaughtException": true
-    },
-    "browse_url": {
-      "launch_url": "",
-      "enabled": false
-    },
-    "try_to_run": {
-      "retrying": 10,
-      "enabled": true
-    },
+    "tiny_https_server": {
+      "subdomains": {
+        "www": {
+          "document_root": "./public/www",
+          "service_worker_version": "0.0.0",
+          "content_delivery_network_url": "",
+          "content_delivery_network_root": "",
+          "precache_urls": null
+        }
+      }
+    }
+  }
+}
+```
+
+## Config-sets file
+
+config-sets.json [*Read more...*](https://github.com/manuel-lohmus/config-sets)
+```json{
+  "production": {
     "tiny_https_server": {
       "domain": "localhost",
       "port": 443,
@@ -136,8 +141,12 @@ config-sets.json [*Read more...*](https://github.com/manuel-lohmus/config-sets)
       "pathToPrivkey": "./cert/localhost-key.pem",
       "pathToCert": "./cert/localhost-cert.pem",
       "subdomains": {
-        "test": {
-          "document_root": "./public/test"
+        "www": {
+          "document_root": "./public/www",
+          "service_worker_version": "1.0.0",
+          "content_delivery_network_url": "",
+          "content_delivery_network_root": "",
+          "precache_urls": null
         }
       },
       "cacheControl": {
@@ -164,12 +173,37 @@ config-sets.json [*Read more...*](https://github.com/manuel-lohmus/config-sets)
         }
       },
       "service_worker_version": "1.0.0",
-      "content_delivery_network_url": "https://cdn.jsdelivr.net/npm/",
+      "content_delivery_network_url": "",
       "content_delivery_network_root": "",
       "precache_urls": null
+    },
+    "try_to_run": {
+      "retrying": 10,
+      "enabled": true
+    },
+    "log_report": {
+      "logDir": "./log/log-report",
+      "enabled": true,
+      "clear_on_startup": false,
+      "save_only_uncaughtException": true
+    },
+    "browse_url": {
+      "launch_url": "",
+      "enabled": true
     }
   },
   "development": {
+    "tiny_https_server": {
+      "port": 80,
+      "subdomains": {
+        "test": {
+          "document_root": "./public/test"
+        }
+      }
+    },
+    "try_to_run": {
+      "enabled": false
+    },
     "log_report": {
       "logDir": "./log/log-report",
       "enabled": true,
@@ -179,16 +213,6 @@ config-sets.json [*Read more...*](https://github.com/manuel-lohmus/config-sets)
     "browse_url": {
       "launch_url": "https://localhost/",
       "enabled": true
-    },
-    "try_to_run": {
-      "enabled": false
-    },
-    "tiny_https_server": {
-      "subdomains": {
-        "test": {
-          "document_root": "./public/test"
-        }
-      }
     }
   }
 }

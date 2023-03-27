@@ -312,13 +312,13 @@ function get_host_settings(host) {
         else if (options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]]) {
             host = objHost.subdomains[objHost.subdomains.length - 1];
         }
-        // Default Domain
+        // Not found domain
         else {
-            host = "";
+            host = 1;
         }
     }
 
-    if (host) {
+    if (options.subdomains[host]) {
         document_root = options.subdomains[host].document_root;
 
         if (!options.subdomains[host].service_worker_version) {
@@ -345,7 +345,7 @@ function get_host_settings(host) {
         }
         precache_urls = options.subdomains[host].precache_urls;
     }
-    else {
+    else if (host === "") {
         document_root = options.document_root;
         service_worker_version = options.service_worker_version;
         content_delivery_network_url = options.content_delivery_network_url;
