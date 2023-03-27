@@ -312,6 +312,9 @@ function get_host_settings(host) {
         else if (options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]]) {
             host = objHost.subdomains[objHost.subdomains.length - 1];
         }
+        else if (["localhost", "127.0.0.1", "::1"].includes(host)) {
+            host = "";
+        }
         // Not found domain
         else {
             host = 1;
