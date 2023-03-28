@@ -1,7 +1,13 @@
 /** Web server functions. @preserve Copyright (c) 2021 Manuel Lõhmus. */
 "use strict";
 
-var hostname = require('os').hostname();
+var hostname = require('os').hostname().toLowerCase();
+var hostnames = [hostname, "localhost", "127.0.0.1", "::1"].concat(Object.values(require("os").networkInterfaces())
+    .flat()
+    .filter(function (item) { return !item.internal && item.family === "IPv4"; })
+    .map(function (item) { return item.address; })
+)
+    .filter(function (item, pos, arr) { return arr.indexOf(item) === pos; });
 var configSets = require('config-sets');
 var options = configSets.init({
     tiny_https_server: {
@@ -312,7 +318,7 @@ function get_host_settings(host) {
         else if (options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]]) {
             host = objHost.subdomains[objHost.subdomains.length - 1];
         }
-        else if (["localhost", "127.0.0.1", "::1"].includes(host)) {
+        else if (hostnames.includes(host)) {
             host = "";
         }
         // Not found domain
