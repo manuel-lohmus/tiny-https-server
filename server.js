@@ -623,17 +623,18 @@ self.addEventListener('activate', event => {
 	);
 });
 self.addEventListener('fetch', function (event) {
-	if (event.request.url.startsWith(self.location.origin)) {
+    var url = event.request.url.split("#").shift();
+	if (url.startsWith(self.location.origin)) {
 		event.respondWith(
-			caches.match(event.request, { ignoreSearch: true }).then(cachedResponse => {
-				if (event.request.url.includes("/$")) {
-					return fetch(new Request(event.request.url, { cache: 'no-cache' }));
+			caches.match(url).then(cachedResponse => {
+				if (url.includes("/$")) {
+					return fetch(new Request(url, { cache: 'no-cache' }));
 				}
 				if (cachedResponse && cachedResponse.status === 200 && !cachedResponse.redirected) {
 					return cachedResponse;
 				}
 				return caches.open(RUNTIME).then(cache => {
-					return get_CDN(cache, event.request.url, cachedResponse?.redirected && cachedResponse.url);
+					return get_CDN(cache, url, cachedResponse?.redirected && cachedResponse.url);
 				});
 			})
 		);
