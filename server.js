@@ -662,7 +662,7 @@ function get_CDN(cache, url) {
 }
 function get_CDN_url(url) {
 	url = (url + "").split("#").shift().split("?").shift();
-	if (url.endsWith("/") || url.endsWith("html")) { return url; }
+	if (url.endsWith("/")${settings.content_delivery_network_url?.includes('cdn.jsdelivr.net') ? ' || url.endsWith("html")' : ''}) { return url; }
     if ("${settings.content_delivery_network_url}") {
         if (url.startsWith("http")) { url = (new URL(url)).pathname; }
 		if (url.includes("/node_modules/")) {
