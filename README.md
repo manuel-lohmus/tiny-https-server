@@ -225,7 +225,7 @@ Read more about the ['browse-url'](https://github.com/manuel-lohmus/browse-url) 
 ## License
 
 
-The MIT License [MIT](LICENSE)
+The [MIT](LICENSE) License 
 ```txt
 Copyright (c) 2021 Manuel Lõhmus <manuel@hauss.ee>
 

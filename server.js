@@ -625,26 +625,29 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', function (event) {
 	if (event.request.url.startsWith(self.location.origin)) {
 		event.respondWith(
-			caches.match(event.request).then(cachedResponse => {
+			caches.match(event.request, { ignoreSearch: true }).then(cachedResponse => {
 				if (event.request.url.includes("/$")) {
 					return fetch(new Request(event.request.url, { cache: 'no-cache' }));
 				}
-				if (cachedResponse) {
+				if (cachedResponse && cachedResponse.status === 200 && !cachedResponse.redirected) {
 					return cachedResponse;
 				}
 				return caches.open(RUNTIME).then(cache => {
-					return get_CDN(cache, event.request.url);
+					return get_CDN(cache, event.request.url, cachedResponse?.redirected && cachedResponse.url);
 				});
 			})
 		);
 	}
 });
-function get_CDN(cache, url) {
+function get_CDN(cache, url, redirectUrl) {
 
-	var CDN_url = get_CDN_url(url);
+	var CDN_url = redirectUrl || get_CDN_url(url);
 
 	return fetch(new Request(CDN_url, { cache: 'no-cache' })).then(response => {
-		if (response.status === 200) {
+		if (response.status === 200 && response.redirected) {
+			return get_CDN(cache, url, response.url);
+		}
+		else if (response.status === 200 && !response.redirected) {
 			return cache.put(url, response.clone()).then(() => {
 				return response;
 			});
@@ -652,7 +655,7 @@ function get_CDN(cache, url) {
 		else {
 			console.warn("Not found resource in", CDN_url);
 			return fetch(new Request(url, { cache: 'no-cache' })).then(response => {
-				if (response.status !== 200) { return response; }
+				if (response.status !== 200 || response.redirected) { return response; }
 				return cache.put(url, response.clone()).then(() => {
 					return response;
 				});
