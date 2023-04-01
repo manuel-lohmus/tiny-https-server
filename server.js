@@ -26,7 +26,7 @@ var options = configSets.init({
             "/": { "X-Frame-Options": "DENY" }
         },
         service_worker_version: "0.0.0",
-        content_delivery_network_url: "https://cdn.jsdelivr.net/npm/",
+        content_delivery_network_url: "", //"https://cdn.jsdelivr.net/npm/",
         content_delivery_network_root: "",
         precache_urls: null
     }
@@ -59,17 +59,18 @@ var path = require("path");
 var zlib = require('zlib');
 var { pipeline } = require('stream');
 
+var url = require('node:url');
 var http = require("http");
 var https = require("https");
 var isSSL = options.port === 80 ? false : options.pathToPrivkey !== "" && options.pathToCert !== "";
-var mimeTypes = require(path.resolve(__dirname, "mimeTypes.js"));
-var logDir = path.resolve(process.cwd(), options.logDir);
+var mimeTypes = require(path.join(__dirname, "mimeTypes.js"));
+var logDir = path.join(process.cwd(), options.logDir);
 
 if (!fs.existsSync(logDir)) { fs.mkdirSync(logDir, { recursive: true }); }
 
 if (!isSSL && options.domain === "localhost" && (!options.port || options.port === 443)) {
-    options.pathToPrivkey = path.resolve(__dirname, "./cert/localhost-key.pem");
-    options.pathToCert = path.resolve(__dirname, "./cert/localhost-cert.pem");
+    options.pathToPrivkey = path.join(__dirname, "./cert/localhost-key.pem");
+    options.pathToCert = path.join(__dirname, "./cert/localhost-cert.pem");
     isSSL = true;
 }
 
@@ -164,7 +165,7 @@ function log(req, res, prefix) {
     var year = date.getFullYear();
     var month = date.getMonth() + 1 < 10 ? `0${date.getMonth() + 1}` : date.getMonth() + 1;
     var day = date.getDate() < 10 ? `0${date.getDate()}` : date.getDate();
-    var fileName = path.resolve(process.cwd(), options.logDir, year + "-" + month + "-" + day + ".log");
+    var fileName = path.join(process.cwd(), options.logDir, year + "-" + month + "-" + day + ".log");
     var msg = prefix ? prefix + " " : "";
     // client address and port
     msg += req.client.remoteAddress + ":" + req.client.remotePort + " ";
@@ -221,7 +222,7 @@ function node_modules_request(req, res, next) {
 
             static_file(filename, res, function () {
 
-                filename = path.resolve(process.cwd(), options.document_root, options.pathToError_404);
+                filename = path.join(process.cwd(), options.document_root, options.pathToError_404);
                 static_file(filename, res, function (exists) {
 
                     if (!exists) {
@@ -272,7 +273,7 @@ function static_request(req, res) {
 
         static_file(filename, res, function () {
 
-            filename = path.resolve(process.cwd(), options.document_root, options.pathToError_404);
+            filename = path.join(process.cwd(), options.document_root, options.pathToError_404);
             static_file(filename, res, function (exists) {
 
                 if (!exists) {
@@ -666,7 +667,8 @@ function get_CDN(cache, url, redirectUrl) {
 }
 function get_CDN_url(url) {
 	url = (url + "").split("#").shift().split("?").shift();
-	if (url.endsWith("/")${settings.content_delivery_network_url?.includes('cdn.jsdelivr.net') ? ' || url.endsWith("html")' : ''}) { return url; }
+	if (url.endsWith("/")${url.parse(settings.content_delivery_network_url).hostname === 'cdn.jsdelivr.net' ? ' || url.endsWith("html")' : ''
+        }) { return url; }
     if ("${settings.content_delivery_network_url}") {
         if (url.startsWith("http")) { url = (new URL(url)).pathname; }
 		if (url.includes("/node_modules/")) {
