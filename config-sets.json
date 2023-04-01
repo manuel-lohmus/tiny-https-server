@@ -38,7 +38,7 @@
         }
       },
       "service_worker_version": "1.0.0",
-      "content_delivery_network_url": "",
+      "content_delivery_network_url": "https://cdn.jsdelivr.net/npm/",
       "content_delivery_network_root": "",
       "precache_urls": null
     },
