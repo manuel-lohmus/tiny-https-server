@@ -454,7 +454,7 @@ function get_host_settings(host) {
         else if (options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]]) {
             host = objHost.subdomains[objHost.subdomains.length - 1];
         }
-        else if (_hostnames().includes(host)) {
+        else if (_hostnames().includes(objHost.hostname)) {
             host = "";
         }
         // Not found domain
