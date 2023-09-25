@@ -32,15 +32,14 @@
         }
       },
       "setHeaders": {
-        "default": {},
-        "/": {
-          "X-Frame-Options": "DENY"
-        }
+        "default": {}
       },
       "service_worker_version": "1.0.0",
       "content_delivery_network_url": "",
       "content_delivery_network_root": "",
-      "precache_urls": null
+      "precache_urls": null,
+      "blacklist": {},
+      "blacklist_blocking_from": 3
     },
     "try_to_run": {
       "retrying": 10,

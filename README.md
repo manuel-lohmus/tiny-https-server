@@ -63,7 +63,8 @@ var urls = [
     `http://test.localhost${port}/`,
     `http://localhost${port}/test`,
     `http://test.localhost${port}/test`,
-    `http://localhost${port}/home`
+    `http://localhost${port}/home`,
+    `http://localhost${port}/blacklist`
 ];
 
 // Opens the URLs in the default browser.

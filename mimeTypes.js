@@ -397,6 +397,7 @@ module.exports = {
     ".w61": "application/wordperfect6.1",
     ".w6w": "application/msword",
     ".wav": "audio/wav",
+    ".wasm": "application/wasm",
     ".wb1": "application/x-qpro",
     ".wbmp": "image/vnd.wap.wbmp",
     ".web": "application/vnd.xara",
