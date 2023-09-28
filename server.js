@@ -62,6 +62,7 @@ var https = require("https");
 var isSSL = options.port === 80 ? false : options.pathToPrivkey !== "" && options.pathToCert !== "";
 var mimeTypes = require(path.join(__dirname, "mimeTypes.js"));
 var logDir = path.join(process.cwd(), options.logDir);
+var blacklist = Object.assign({}, options.blacklist);
 
 if (!fs.existsSync(logDir)) { fs.mkdirSync(logDir, { recursive: true }); }
 
@@ -81,16 +82,16 @@ if (isSSL) {
 
             var ip = req.client.remoteAddress;
 
-            if (configSets.tiny_https_server.blacklist[ip]
-                && configSets.tiny_https_server.blacklist[ip].queries >= configSets.tiny_https_server.blacklist_blocking_from) {
-                configSets.tiny_https_server.blacklist[ip].status = "blocking";
-                configSets.tiny_https_server.blacklist[ip].queries++;
-                blacklist_request(req, res);
-                return;
-            }
-            else if (req.url.startsWith("/.well-known/acme-challenge/") && isValidatePath(req.url.substring(2))) {
+            if (req.url.startsWith("/.well-known/acme-challenge/") && isValidatePath(req.url.substring(2))) {
                 // for .well-known/acme-challenge/
                 static_request(req, res);
+            }
+            else if (blacklist[ip]
+                && blacklist[ip].queries >= options.blacklist_blocking_from) {
+                blacklist[ip].status = "blocking";
+                blacklist[ip].queries++;
+                blacklist_request(req, res);
+                return;
             }
             else {
                 // redirect http to https
@@ -145,25 +146,25 @@ server.emit = function (eventName, req, res) {
 
             var ip = req.client.remoteAddress;
 
-            if (options.blacklist[ip]
-                && options.blacklist[ip].queries >= options.blacklist_blocking_from) {
-                options.blacklist[ip].queries++;
-                options.blacklist[ip].last_request = last_request(req, res);
-                options.blacklist[ip].last_interval = last_interval(options.blacklist[ip].last_date || options.blacklist[ip].start_date);
-                options.blacklist[ip].last_date = new Date().toJSON();
-                if (options.blacklist[ip].queries.toString().endsWith("00")) {
-                    configSets.save();
+            if (blacklist[ip]
+                && blacklist[ip].queries > options.blacklist_blocking_from) {
+                blacklist[ip].queries++;
+                blacklist[ip].last_request = last_request(req, res);
+                blacklist[ip].last_interval = last_interval(blacklist[ip].last_date || blacklist[ip].start_date);
+                blacklist[ip].last_date = new Date().toJSON();
+                if (blacklist[ip].queries.toString().endsWith("0")) {
+                    saveBlacklist();
                 }
-                if (options.blacklist[ip].status !== "blocking") {
-                    options.blacklist[ip].status = "blocking";
-                    configSets.save();
+                if (blacklist[ip].status !== "blocking") {
+                    blacklist[ip].status = "blocking";
+                    saveBlacklist();
                 }
                 blacklist_request(req, res);
                 return;
             }
             if (!ip || !isValidatePath(req.url)) {
-                if (!options.blacklist[ip]) {
-                    options.blacklist[ip] = {
+                if (!blacklist[ip]) {
+                    blacklist[ip] = {
                         status: "watching",
                         start_date: new Date().toJSON(),
                         queries: 1,
@@ -171,11 +172,11 @@ server.emit = function (eventName, req, res) {
                     };
                 }
                 else {
-                    options.blacklist[ip].queries++;
-                    options.blacklist[ip].status = "watching";
-                    options.blacklist[ip].last_request = last_request(req, res);
-                    options.blacklist[ip].last_interval = last_interval(options.blacklist[ip].last_date || options.blacklist[ip].start_date);
-                    options.blacklist[ip].last_date = new Date().toJSON();
+                    blacklist[ip].queries++;
+                    blacklist[ip].status = "watching";
+                    blacklist[ip].last_request = last_request(req, res);
+                    blacklist[ip].last_interval = last_interval(blacklist[ip].last_date || blacklist[ip].start_date);
+                    blacklist[ip].last_date = new Date().toJSON();
                 }
                 bad_request(req, res);
                 return;
@@ -241,41 +242,12 @@ server.listen(options.port, function (err) {
 
 server.on("request", function (req, res, next) {
 
-    if (req.url.includes("blacklist")) {
-        function sort(obj) {
-
-            var entries = Array.from(Object.entries(obj));
-            entries.sort(function (a, b) {
-
-                if (a[1].last_date === undefined && b[1].last_date) {
-                    return 1;
-                } else if (a[1].last_date && b[1].last_date === undefined) {
-                    return -1;
-                } else if (a[1].last_date < b[1].last_date) {
-                    return 1;
-                } else if (a[1].last_date > b[1].last_date) {
-                    return -1;
-                } else if (a[1].start_date === undefined && b[1].start_date) {
-                    return 1;
-                } else if (a[1].start_date && b[1].start_date === undefined) {
-                    return -1;
-                } else if (a[1].start_date < b[1].start_date) {
-                    return 1;
-                } else if (a[1].start_date > b[1].start_date) {
-                    return -1;
-                } else {
-                    return 0;
-                }
-            });
-
-            var o = Object.fromEntries(entries);
-            return o;
-        }
+    if (req.url === "/blacklist" || req.url === "/$blacklist") {
         res.writeHead(200, {
             "Content-Type": "text/json",
             "Cache-Control": "no-cache"
         });
-        res.write(JSON.stringify(sort(configSets.tiny_https_server.blacklist), null, 2));
+        res.write(JSON.stringify(sortBlacklist(blacklist), null, 2));
         res.end();
         return;
     }
@@ -292,7 +264,7 @@ function log(req, res, prefix) {
     var day = date.getUTCDate() < 10 ? `0${date.getUTCDate()}` : date.getUTCDate();
     var fileName = path.join(process.cwd(), options.logDir, year + "-" + month + "-" + day + ".log");
     var msg = prefix ? prefix + " " : "";
-    msg = configSets.tiny_https_server.blacklist[ip] ? configSets.tiny_https_server.blacklist[ip].status + " " : "";
+    msg = blacklist[ip] ? blacklist[ip].status + " " : "";
     // client address and port
     msg += ip + ":" + port + " ";
     // universal time
@@ -749,6 +721,43 @@ function blacklist_request(req, res) {
         clearTimeout(res.timeout);
     });
     res.timeout = setTimeout(function () { wait(); }, 3000);
+}
+
+function sortBlacklist(blacklist, blockedOnly) {
+
+    var entries = Array.from(Object.entries(blacklist));
+    if (blockedOnly) { entries = entries.filter(function (v) { return v[1].status === "blocking"; }); }
+    entries.sort(function (a, b) {
+
+        if (a[1].last_date === undefined && b[1].last_date) {
+            return 1;
+        } else if (a[1].last_date && b[1].last_date === undefined) {
+            return -1;
+        } else if (a[1].last_date < b[1].last_date) {
+            return 1;
+        } else if (a[1].last_date > b[1].last_date) {
+            return -1;
+        } else if (a[1].start_date === undefined && b[1].start_date) {
+            return 1;
+        } else if (a[1].start_date && b[1].start_date === undefined) {
+            return -1;
+        } else if (a[1].start_date < b[1].start_date) {
+            return 1;
+        } else if (a[1].start_date > b[1].start_date) {
+            return -1;
+        } else {
+            return 0;
+        }
+    });
+
+    return Object.fromEntries(entries);
+}
+
+function saveBlacklist() {
+
+    options.blacklist = sortBlacklist(blacklist, true);
+
+    configSets.save();
 }
 
 module.exports = server;
