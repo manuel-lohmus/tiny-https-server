@@ -260,7 +260,7 @@ function log(req, res, prefix) {
     var port = req.client.remotePort;
     var date = new Date();
     var year = date.getUTCFullYear();
-    var month = date.getUTCMonth() + 1 < 10 ? `0${date.getMonth() + 1}` : date.getMonth() + 1;
+    var month = date.getUTCMonth() + 1 < 10 ? `0${date.getUTCMonth() + 1}` : date.getUTCMonth() + 1;
     var day = date.getUTCDate() < 10 ? `0${date.getUTCDate()}` : date.getUTCDate();
     var fileName = path.join(process.cwd(), options.logDir, year + "-" + month + "-" + day + ".log");
     var msg = prefix ? prefix + " " : "";
