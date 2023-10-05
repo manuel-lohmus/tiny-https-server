@@ -242,7 +242,7 @@ server.listen(options.port, function (err) {
 
 server.on("request", function (req, res, next) {
 
-    if (req.url === "/blacklist" || req.url === "/$blacklist") {
+    if (req.headers.host === options.domain && (req.url === "/blacklist" || req.url === "/$blacklist")) {
         res.writeHead(200, {
             "Content-Type": "text/json",
             "Cache-Control": "no-cache"
@@ -264,9 +264,9 @@ function log(req, res, prefix) {
     var day = date.getUTCDate() < 10 ? `0${date.getUTCDate()}` : date.getUTCDate();
     var fileName = path.join(process.cwd(), options.logDir, year + "-" + month + "-" + day + ".log");
     var msg = prefix ? prefix + " " : "";
-    msg = blacklist[ip] ? blacklist[ip].status + " " : "";
+    msg = blacklist[ip] ? blacklist[ip].status + " " : "         ";
     // client address and port
-    msg += ip + ":" + port + " ";
+    msg += ip + ":" + port + "\t";
     // universal time
     var hours = date.getUTCHours().toString(),
         minutes = date.getUTCMinutes().toString(),
@@ -280,7 +280,7 @@ function log(req, res, prefix) {
     // status code or connection refused
     msg += res.writableFinished ? res.statusCode + " " : "--- ";
     // host:port method url httpVersion
-    msg += req.headers.host + (req.socket.localPort ? ":" + req.socket.localPort : "") + " " + req.method + " " + req.url + " HTTP/" + req.httpVersion + ' ';
+    msg += req.headers.host + (req.socket.localPort ? ":" + req.socket.localPort : "") + "\t" + req.method + " " + req.url + " HTTP/" + req.httpVersion + "\t\t";
     // user agent
     msg += '"' + req.headers["user-agent"] + '"\r\n';
 
@@ -426,7 +426,7 @@ function get_host_settings(host) {
         else if (options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]]) {
             host = objHost.subdomains[objHost.subdomains.length - 1];
         }
-        else if (_hostnames().includes(objHost.hostname)) {
+        else if (_hostnames().includes(objHost.domain)) {
             host = "";
         }
         // Not found domain
@@ -438,25 +438,25 @@ function get_host_settings(host) {
     if (options.subdomains[host]) {
         document_root = options.subdomains[host].document_root;
 
-        if (!options.subdomains[host].service_worker_version) {
+        if (options.subdomains[host].service_worker_version === undefined) {
             options.subdomains[host].service_worker_version = service_worker_version;
             configSets.save();
         }
         service_worker_version = options.subdomains[host].service_worker_version;
 
-        if (!options.subdomains[host].content_delivery_network_url) {
+        if (options.subdomains[host].content_delivery_network_url === undefined) {
             options.subdomains[host].content_delivery_network_url = content_delivery_network_url;
             configSets.save();
         }
         content_delivery_network_url = options.subdomains[host].content_delivery_network_url;
 
-        if (!options.subdomains[host].content_delivery_network_root) {
+        if (options.subdomains[host].content_delivery_network_root === undefined) {
             options.subdomains[host].content_delivery_network_root = content_delivery_network_root;
             configSets.save();
         }
         content_delivery_network_root = options.subdomains[host].content_delivery_network_root;
 
-        if (!options.subdomains[host].precache_urls) {
+        if (options.subdomains[host].precache_urls === undefined) {
             options.subdomains[host].precache_urls = precache_urls;
             configSets.save();
         }
@@ -687,8 +687,7 @@ function isValidatePath(strPath) {
 
 function bad_request(req, res) {
 
-    res.writeHead(400, { "Content-Type": "text/plain" });
-    res.write("400 Bad Request\n");
+    res.writeHead(400);
 
     setTimeout(function () {
         res.end();
@@ -705,7 +704,7 @@ function blacklist_request(req, res) {
 
             if (count > 20) {
 
-                res.writeHead(408);
+                res.writeHead(408, { Connection: "close" });
                 res.end();
                 return;
             }
@@ -730,9 +729,17 @@ function sortBlacklist(blacklist, blockedOnly) {
     entries.sort(function (a, b) {
 
         if (a[1].last_date === undefined && b[1].last_date) {
-            return 1;
+            if (a[1].start_date < b[1].last_date) {
+                return 1;
+            } else {
+                return -1;
+            }
         } else if (a[1].last_date && b[1].last_date === undefined) {
-            return -1;
+            if (a[1].last_date < b[1].start_date) {
+                return 1;
+            } else {
+                return -1;
+            }
         } else if (a[1].last_date < b[1].last_date) {
             return 1;
         } else if (a[1].last_date > b[1].last_date) {
