@@ -20,11 +20,6 @@ app.js
 ```js
 require('log-report');
 
-if (require("try-to-run")()) {
-    // isMainThread
-    return;
-}
-
 console.time("Time");
 var options = require("config-sets").tiny_https_server;
 options.subdomains = { test: "./public/test" };
@@ -178,10 +173,6 @@ config-sets.json [*Read more...*](https://github.com/manuel-lohmus/config-sets)
       "content_delivery_network_root": "",
       "precache_urls": null
     },
-    "try_to_run": {
-      "retrying": 10,
-      "enabled": true
-    },
     "log_report": {
       "logDir": "./log/log-report",
       "enabled": true,
@@ -220,7 +211,6 @@ config-sets.json [*Read more...*](https://github.com/manuel-lohmus/config-sets)
 ```
 
 Read more about the ['log-report'](https://github.com/manuel-lohmus/log-report) module.\
-Read more about the ['try-to-run'](https://github.com/manuel-lohmus/try-to-run) module.\
 Read more about the ['browse-url'](https://github.com/manuel-lohmus/browse-url) module.
 
 ## License

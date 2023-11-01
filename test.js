@@ -2,11 +2,6 @@
 
 require('log-report');
 
-if (require("try-to-run")()) {
-    // isMainThread
-    return;
-}
-
 console.time("Time");
 var options = require("config-sets").tiny_https_server;
 options.subdomains = { test: { document_root: "./public/test" } };

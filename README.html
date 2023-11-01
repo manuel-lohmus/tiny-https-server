@@ -20,11 +20,6 @@ Serving static files.</p>
 <p>app.js</p>
 <pre><code class="language-js">require('log-report');
 
-if (require(&quot;try-to-run&quot;)()) {
-    // isMainThread
-    return;
-}
-
 console.time(&quot;Time&quot;);
 var options = require(&quot;config-sets&quot;).tiny_https_server;
 options.subdomains = { test: &quot;./public/test&quot; };
@@ -167,10 +162,6 @@ For example <code>/$service_worker_version</code>.</p>
       &quot;content_delivery_network_root&quot;: &quot;&quot;,
       &quot;precache_urls&quot;: null
     },
-    &quot;try_to_run&quot;: {
-      &quot;retrying&quot;: 10,
-      &quot;enabled&quot;: true
-    },
     &quot;log_report&quot;: {
       &quot;logDir&quot;: &quot;./log/log-report&quot;,
       &quot;enabled&quot;: true,
@@ -208,7 +199,6 @@ For example <code>/$service_worker_version</code>.</p>
 }
 </code></pre>
 <p>Read more about the <a href="https://github.com/manuel-lohmus/log-report">'log-report'</a> module.<br />
-Read more about the <a href="https://github.com/manuel-lohmus/try-to-run">'try-to-run'</a> module.<br />
 Read more about the <a href="https://github.com/manuel-lohmus/browse-url">'browse-url'</a> module.</p>
 <h2 id="license">License</h2>
 <p>The <a href="LICENSE">MIT</a> License</p>

@@ -1,3 +1,3 @@
 'use strict';
 
-require('try-to-run')('./server.js');
+require('./server.js');

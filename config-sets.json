@@ -11,7 +11,11 @@
       "pathToCert": "./cert/localhost-cert.pem",
       "subdomains": {
         "test": {
-          "document_root": "./public/test"
+          "document_root": "./public/test",
+          "service_worker_version": "0.0.0",
+          "content_delivery_network_url": "",
+          "content_delivery_network_root": "",
+          "precache_urls": null
         }
       },
       "cacheControl": {

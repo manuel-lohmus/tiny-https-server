@@ -65,6 +65,7 @@ var logDir = path.join(process.cwd(), options.logDir);
 var blacklist = Object.assign({}, options.blacklist);
 
 if (!fs.existsSync(logDir)) { fs.mkdirSync(logDir, { recursive: true }); }
+if (!fs.existsSync(path.join(process.cwd(), options.document_root))) { fs.mkdirSync(path.join(process.cwd(), options.document_root), { recursive: true }); }
 
 if (!isSSL && options.domain === "localhost" && (!options.port || options.port === 443)) {
     options.pathToPrivkey = path.join(__dirname, "./cert/localhost-key.pem");
@@ -92,6 +93,9 @@ if (isSSL) {
                 blacklist[ip].queries++;
                 blacklist_request(req, res);
                 return;
+            }
+            else if (!isValidatePath(req.url)) {
+                bad_request(req, res);
             }
             else {
                 // redirect http to https
