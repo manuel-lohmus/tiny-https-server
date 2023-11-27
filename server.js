@@ -21,8 +21,8 @@ var options = configSets.init({
             //"/": { "X-Frame-Options": "DENY" }
         },
         service_worker_version: "0.0.0",
-        content_delivery_network_url: " ", //"https://cdn.jsdelivr.net/npm/",
-        content_delivery_network_root: " ",
+        content_delivery_network_url: "", //"https://cdn.jsdelivr.net/npm/",
+        content_delivery_network_root: "",
         precache_urls: null,
         blacklist: {},
         blacklist_blocking_from: 100
@@ -148,6 +148,12 @@ server.emit = function (eventName, req, res) {
                 log(req, res);
             });
 
+            if (options.port === 80 && req.url.startsWith("/.well-known/acme-challenge/") && isValidatePath(req.url.substring(2))) {
+                // for .well-known/acme-challenge/
+                static_request(req, res);
+                return;
+            }
+            
             var ip = req.client.remoteAddress;
 
             if (blacklist[ip]
@@ -234,7 +240,7 @@ function last_interval(last_date) {
     return result;
 }
 
-server.listen(options.port, function (err) {
+server.listen({ port: options.port, host: options.host }, function (err) {
 
     if (err)
         console.error("[ ERROR ] 'tiny_https_server' " + err);

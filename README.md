@@ -10,7 +10,7 @@ Easy to use and configure.
 Handle subdomains.
 Serving static files.
 
-## Installing
+## Installation
 
 `npm install tiny-https-server`
 
@@ -172,7 +172,7 @@ config-sets.json [*Read more...*](https://github.com/manuel-lohmus/config-sets)
       "content_delivery_network_url": "",
       "content_delivery_network_root": "",
       "precache_urls": null
-    },
+    },Installation
     "log_report": {
       "logDir": "./log/log-report",
       "enabled": true,
