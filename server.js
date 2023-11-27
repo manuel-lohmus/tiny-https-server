@@ -114,7 +114,7 @@ if (isSSL) {
 </html>
             `);
             }
-        }).listen(80);
+        }).listen({ port: 80, host: options.host });
     }
     catch (err) { console.error(err); }
 }
