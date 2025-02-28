@@ -10,3 +10,4 @@
 /obj/Debug/tiny-https-server.esproj.FileListAbsolute.txt
 /obj/Debug/tiny-https-server.esproj.CoreCompileInputs.cache
 /obj/Debug/package.g.props
+/.github/workflows/node.js.yml
