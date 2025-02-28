@@ -3,8 +3,7 @@
 var WebCluster = require('./index.js'),
     configSets = require("config-sets"),
     { isPrimary } = require('node:cluster'),
-    { request } = require('node:http'),
-    url = require('node:url');
+    { request } = require('node:http');
 
 configSets.isSaveChanges = false;
 
@@ -12,7 +11,7 @@ var cluster = WebCluster({
         isDebug: true,
         parallelism: 'auto',
         host: 'localhost',
-        port: 80,
+        port: 3000,
         primary_domain: {
             service_worker_version: "1",
             is_new_service_worker_reload_browser: true
@@ -50,10 +49,7 @@ var cluster = WebCluster({
     }
 );
 
-if (isPrimary) {
-
-    setTimeout(test, 3000);
-}
+if (isPrimary) { setTimeout(test, 10000); }
 
 
 function test() {
@@ -193,8 +189,8 @@ function test() {
      * @property {string} data Response data.
      */
     function httpRequest(url, cb) {
-        
-        var req = request(url, function (res) {
+
+        var req = request(url, { port: cluster.serverOptions.port }, function (res) {
             
             res.data = '';
             res.on('data', function (chunk) { res.data += chunk; });

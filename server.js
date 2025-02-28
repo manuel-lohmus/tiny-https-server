@@ -705,7 +705,8 @@ function _setDefHeader(req, res) {
             }
         }
     }
-} function _service_worker_version_request(req, res) {
+}
+function _service_worker_version_request(req, res) {
 
     if (req.method.toLocaleUpperCase() === "GET") {
 
@@ -898,6 +899,10 @@ function _get_host_settings(host, options) {
         // Virtual Domain
         if (options.subdomains[objHost.domain]) {
             host = objHost.domain;
+        }
+        // Subdomain
+        else if (options.subdomains[objHost.hostname]) {
+            host = objHost.hostname;
         }
         // Subdomain
         else if (options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]]) {
