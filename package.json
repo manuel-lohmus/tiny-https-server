@@ -1,6 +1,6 @@
 {
   "name": "tiny-https-server",
-  "version": "2.0.0-beta.2",
+  "version": "2.0.0-beta.3",
   "license": "MIT",
   "description": "Tiny web server with HTTPS support, static file serving, subdomain support, middleware support, and service worker support.",
   "keywords": [
@@ -43,7 +43,7 @@
     "public/www/favicon-192x192.png",
     "public/www/favicon-512x512.png",
     "public/www/index.html",
-    "public/www/pwa.manifest.json",
+    "public/www/pwa.manifest",
     "public/www/robots.txt",
     "public/www/sitemap.xml",
     "browser.js",
@@ -52,7 +52,8 @@
     "LICENSE",
     "mimeTypes.js",
     "package.json",
-    "README.md"
+    "README.md",
+    "server.js"
   ],
   "homepage": "https://github.com/manuel-lohmus/tiny-https-server#readme",
   "bugs": {
