@@ -5,4 +5,8 @@
 /tiny-https-server.esproj
 /test.js
 /node_modules
+/obj
 *.tgz
+/obj/Debug/tiny-https-server.esproj.FileListAbsolute.txt
+/obj/Debug/tiny-https-server.esproj.CoreCompileInputs.cache
+/obj/Debug/package.g.props
