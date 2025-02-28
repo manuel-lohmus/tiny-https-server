@@ -1,240 +1,138 @@
-# tiny-https-server: Easy tiny https web server middleware.
+﻿<div class="row w-100">
+<div class="col-3 d-none d-lg-inline">
+<div class="sticky-top overflow-auto vh-100">
+<div id="list-headers" class="list-group mt-5">
 
-[![npm-version](https://badgen.net/npm/v/tiny-https-server)](https://www.npmjs.com/package/tiny-https-server)
-[![npm-total-downloads](https://badgen.net/npm/dt/tiny-https-server)](https://www.npmjs.com/package/tiny-https-server)
-[![npm-week-downloads](https://badgen.net/npm/dw/tiny-https-server)](https://www.npmjs.com/package/tiny-https-server)
-[![](https://data.jsdelivr.com/v1/package/npm/tiny-https-server/badge)](https://www.jsdelivr.com/package/npm/tiny-https-server)
+- [Tiny HTTPS Server](#tiny-https-server)
+     - [Description](#description)
+     - [Features](#features)
+     - [Installation](#installation)
+     - [Testing](#testing)
+     - [How to use](#how-to-use)
+     - [License](#license)
+ 
+ 
+</div>
+</div>
+</div>
+ 
+<div class="col">
+<div class="p-2 markdown-body" data-bs-spy="scroll" data-bs-target="#list-headers" data-bs-offset="0" tabindex="0">
 
-Easy tiny https web server middleware.
-Easy to use and configure.
-Handle subdomains.
-Serving static files.
+
+# Tiny HTTPS Server
+This manual is also available in [HTML5](https://manuel-lohmus.github.io/tiny-https-server/README.html).<br>
+Tiny web server with HTTPS support, static file serving, 
+subdomain support, middleware support, service worker support, and clastering support.
+
+## Description
+Tiny web server is disain for SPA (Single Page Application). 
+This project is a tiny web server that serves static files, supports HTTPS, 
+subdomains, middleware, and service workers. 
+When you run the server, it will serve the files in the `public` directory. 
+You can add your own files to the `public` directory and access them through the server. 
+The server also supports subdomains, so you can access different files based on the subdomain. 
+For example, if you have a file called `index.html` in the `public` directory, 
+you can access it through `https://localhost/index.html`. 
+If you have a file called `index.html` in the `public/subdomain` directory, 
+you can access it through `https://subdomain.localhost/index.html`. 
+The server also supports middleware, so you can add your own middleware functions to the server. 
+The server also supports service workers. 
+For testing uses a self-signed certificate, so you may see a warning in your browser when you access the server.
+You can ignore the warning and proceed to the server.
+Yor can mount the express.js style middleware to the server. Example:
+```javascript
+const WebCluster = require('tiny-https-server');
+const express = require('express');
+const admin = express();
+admin.get('/', (req, res) => {
+  res.send('Admin Homepage');
+});
+consr cluster = WebCluster({
+    //isDebug: true,
+    parallelism: 'auto 2'
+}, function _initServer(server) {
+    server.addRequest({ path: '/admin' }, admin);
+});
+```
+
+
+## Features
+
+- HTTPS support
+- HTTP to HTTPS redirection 
+- static file serving
+- subdomain support 
+- service worker support 
+- blacklist support
+- middleware support 
+- mounting support express.js style
+- clastering support automatic scaling up and down
+- compression support
+- cache control support
+- path validation support
+- traffic-advice support
+- security.txt support
+- acme-challenge support for letsencrypt
+- test self-signed certificate support
+- configurable in JSON format file `config-sets.json`
+- command line support example: `tiny-https-server --help` or `tiny-https-server --parallelism='auto 1' --open` 
 
 ## Installation
 
+You can install `tiny-https-server` using this command:
+
 `npm install tiny-https-server`
+ 
+ ## Testing
 
-## Usage example
+You can test `tiny-https-server` on your system using this command:
 
-app.js
-```js
-require('log-report');
+`node ./node_modules/tiny-https-server/index.test`
 
-console.time("Time");
-var options = require("config-sets").tiny_https_server;
-options.subdomains = { test: "./public/test" };
+or in the `tiny-https-server` project directory:
 
-var server = require("tiny-https-server");
-//var server = require("./server.min.js");
+`npm test`
 
-// Console log
-server.on("request", function (req, res, next) {
-    console.timeLog("Time", `Url: ${req.headers.host}${req.url}`);
-    next();
-});
-// Test page.
-server.on("request", function (req, res, next) {
-    if (req.url === "/test") {
-        res.writeHead(200, { "Content-Type": "text/plain" });
-        res.write("Test page.");
-        res.end();
-    }
-    else
+## How to use
+
+You can use `tiny-https-server` in your project like this:
+
+```javascript
+const WebCluster = require('tiny-https-server');
+
+consr cluster = WebCluster({
+    isDebug: true, // Enable debug mode to see logs in the console
+    parallelism: 'auto 2' // Start 2 workers and scale up and down automatically
+}, function _initServer(server) {
+    // Add a request handler for the /hello path
+    server.on('request', (req, res, next) => {
+    
+        if (req.url === '/hello') {
+
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('Hello World');
+            return;
+        }
+    
         next();
+    });
 });
-// Simulated crash ...
-server.on("request", function (req, res, next) {
-    if (req.url === "/crash") {
-        throw new Error("Simulated crash ...");
-    }
-    else
-        next();
-});
-
-
-var port = options.port === 443 ? "" : ":" + options.port;
-var urls = [
-    `http://localhost${port}/`,
-    `http://test.localhost${port}/`,
-    `http://localhost${port}/test`,
-    `http://test.localhost${port}/test`,
-    `http://localhost${port}/home`,
-    `http://localhost${port}/blacklist`
-];
-
-// Opens the URLs in the default browser.
-while (urls.length) {
-    require("browse-url")(urls.shift());
-}
 ```
-
-## Service Worker example
-
-Read more about the ['Service Worker API'](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API)\
-Set the current 'service_worker_version' in the config-sets.json file.
-```json
-{
-  "production": {
-    "tiny_https_server": {
-      "service_worker_version": "1.0.0",
-      "content_delivery_network_url": "",       /***** "" | "https://cdn.jsdelivr.net/npm/" *****/
-      "content_delivery_network_root": "",      /***** "" | "npm_name/www" *****/
-      "precache_urls": null                     /***** null | [] | ["/index.html, ..."] *****/
-    }
-  }
-}
-```
-
-Add to the webpage [Service Worker Script](browser.js)
-```html
-<!doctype html>
-<html>
-<head>
-    <title>Public</title>
-    <!-- Service Worker Script -->
-    <script async src="node_modules/tiny-https-server"></script>
-</head>
-<body>
-    Public
-</body>
-</html>
-```
-Start a `/$` url that bypasses the Service Worker cache.\
-For example `/$service_worker_version`.
-
-## Add a subdomain
-
-```json
-{
-  "production": {
-    "tiny_https_server": {
-      "subdomains": {
-        "www": {
-          "document_root": "./public/www",
-          "service_worker_version": "0.0.0",
-          "content_delivery_network_url": "",
-          "content_delivery_network_root": "",
-          "precache_urls": null
-        }
-      }
-    }
-  }
-}
-```
-
-## Config-sets file
-
-config-sets.json [*Read more...*](https://github.com/manuel-lohmus/config-sets)
-```json{
-  "production": {
-    "tiny_https_server": {
-      "domain": "localhost",
-      "port": 443,
-      "logDir": "./log/tiny-https-server",
-      "document_root": "./public/www",
-      "directory_index": "index.html",
-      "pathToError_404": "./error_404.html",
-      "pathToPrivkey": "./cert/localhost-key.pem",
-      "pathToCert": "./cert/localhost-cert.pem",
-      "subdomains": {
-        "www": {
-          "document_root": "./public/www",
-          "service_worker_version": "1.0.0",
-          "content_delivery_network_url": "",
-          "content_delivery_network_root": "",
-          "precache_urls": null
-        }
-      },
-      "cacheControl": {
-        "fileTypes": {
-          "webp": "max-age=2592000",
-          "bmp": "max-age=2592000",
-          "jpeg": "max-age=2592000",
-          "jpg": "max-age=2592000",
-          "png": "max-age=2592000",
-          "svg": "max-age=2592000",
-          "pdf": "max-age=2592000",
-          "woff2": "max-age=2592000",
-          "woff": "max-age=2592000",
-          "image/svg+xml": "max-age=2592000",
-          "html": "max-age=86400",
-          "css": "max-age=86400",
-          "js": "max-age=86400"
-        }
-      },
-      "setHeaders": {
-        "default": {},
-        "/": {
-          "X-Frame-Options": "DENY"
-        }
-      },
-      "service_worker_version": "1.0.0",
-      "content_delivery_network_url": "",
-      "content_delivery_network_root": "",
-      "precache_urls": null
-    },Installation
-    "log_report": {
-      "logDir": "./log/log-report",
-      "enabled": true,
-      "clear_on_startup": false,
-      "save_only_uncaughtException": true
-    },
-    "browse_url": {
-      "launch_url": "",
-      "enabled": true
-    }
-  },
-  "development": {
-    "tiny_https_server": {
-      "port": 80,
-      "subdomains": {
-        "test": {
-          "document_root": "./public/test"
-        }
-      }
-    },
-    "try_to_run": {
-      "enabled": false
-    },
-    "log_report": {
-      "logDir": "./log/log-report",
-      "enabled": true,
-      "clear_on_startup": true,
-      "save_only_uncaughtException": false
-    },
-    "browse_url": {
-      "launch_url": "https://localhost/",
-      "enabled": true
-    }
-  }
-}
-```
-
-Read more about the ['log-report'](https://github.com/manuel-lohmus/log-report) module.\
-Read more about the ['browse-url'](https://github.com/manuel-lohmus/browse-url) module.
 
 ## License
 
+This project is licensed under the MIT License.
 
-The [MIT](LICENSE) License 
-```txt
-Copyright (c) 2021 Manuel Lõhmus <manuel@hauss.ee>
+Copyright &copy; 2021 Manuel Lõhmus
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+[![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/donate?hosted_button_id=H2ZHLF8U2HGVA)
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Donations are welcome and will go towards further development of this project.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+<br>
+<br>
+<br>
+</div>
+</div>
+</div>

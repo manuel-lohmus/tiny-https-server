@@ -1,7 +1,8 @@
 {
   "name": "tiny-https-server",
-  "version": "1.7.8",
-  "description": "Easy tiny https web server middleware.",
+  "version": "2.0.0-beta1",
+  "license": "MIT",
+  "description": "Tiny web server with HTTPS support, static file serving, subdomain support, middleware support, and service worker support.",
   "keywords": [
     "tiny",
     "web",
@@ -16,29 +17,42 @@
     "sw",
     "service-worker",
     "pwa",
-    "cdn"
+    "progressive",
+    "app",
+    "manifest",
+    "favicon",
+    "robots",
+    "sitemap",
+    "seo"
   ],
-  "main": "server.js",
   "browser": "browser.js",
-  "license": "MIT",
-  "author": "Manuel Lõhmus <manuel@hauss.ee>",
+  "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "test": "node test.js"
+    "test": "node index.test",
+    "start": "node index.js"
   },
+  "bin": {
+    "tiny-https-server": "bin/tiny-https-server.js"
+  },
+  "author": "Manuel Lõhmus <manuel@hauss.ee>",
   "files": [
+    "bin/tiny-https-server.js",
     "cert/localhost-cert.pem",
     "cert/localhost-key.pem",
-    "public",
+    "public/www/favicon.ico",
+    "public/www/favicon-192x192.png",
+    "public/www/favicon-512x512.png",
+    "public/www/index.html",
+    "public/www/pwa.manifest.json",
+    "public/www/robots.txt",
+    "public/www/sitemap.xml",
     "browser.js",
     "index.js",
+    "index.test.js",
     "LICENSE",
     "mimeTypes.js",
     "package.json",
-    "README.md",
-    "README.html",
-    "server.js",
-    "test.js"
+    "README.md"
   ],
   "homepage": "https://github.com/manuel-lohmus/tiny-https-server#readme",
   "bugs": {
@@ -49,11 +63,9 @@
     "url": "git+https://github.com/manuel-lohmus/tiny-https-server.git"
   },
   "dependencies": {
-    "config-sets": "^2.5.0"
+    "config-sets": "^3.0.0-beta.3",
+    "data-context": "^2.0.0-beta.6"
   },
-  "devDependencies": {
-    "browse-url": "^1.1.5",
-    "log-report": "^2.1.5",
-    "try-to-run": "^1.3.6"
-  }
+  "devDependencies": {},
+  "funding": "https://manuel-lohmus.github.io/tiny-https-server/README.html#license"
 }

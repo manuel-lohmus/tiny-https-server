@@ -5,3 +5,4 @@
 /tiny-https-server.esproj
 /test.js
 /node_modules
+*.tgz

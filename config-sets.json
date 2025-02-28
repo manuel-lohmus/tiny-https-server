@@ -1,24 +1,31 @@
 {
+  "isProduction": true,
   "production": {
-    "tiny_https_server": {
-      "domain": "localhost",
-      "port": 443,
+    "web-cluster": {
+      "isDebug": true,
+      "parallelism": "auto 2"
+    },
+    "tiny-https-server": {
+      "isDebug": true,
+      "host": "localhost",
+      "port": 80,
+      "exclusive": false,
+      "maxHeaderSize": 1024,
       "logDir": "./log/tiny-https-server",
-      "document_root": "./public/www",
       "directory_index": "index.html",
-      "pathToError_404": "./error_404.html",
-      "pathToPrivkey": "./cert/localhost-key.pem",
-      "pathToCert": "./cert/localhost-cert.pem",
-      "subdomains": {
-        "test": {
-          "document_root": "./public/test",
-          "service_worker_version": "0.0.0",
-          "content_delivery_network_url": "",
-          "content_delivery_network_root": "",
-          "precache_urls": null
+      "primary_domain": {
+        "document_root": "./public/www",
+        "service_worker_version": "0",
+        "is_new_service_worker_reload_browser": false,
+        "precache_urls": [],
+        "headers": {
+          "default": {
+            "server": "tiny-https-server"
+          }
         }
       },
-      "cacheControl": {
+      "subdomains": {},
+      "cache_control": {
         "fileTypes": {
           "webp": "max-age=2592000",
           "bmp": "max-age=2592000",
@@ -35,52 +42,14 @@
           "js": "max-age=86400"
         }
       },
-      "setHeaders": {
-        "default": {}
-      },
-      "service_worker_version": "1.0.0",
-      "content_delivery_network_url": "",
-      "content_delivery_network_root": "",
-      "precache_urls": null,
-      "blacklist": {},
-      "blacklist_blocking_from": 3
-    },
-    "try_to_run": {
-      "retrying": 10,
-      "enabled": true
-    },
-    "log_report": {
-      "logDir": "./log/log-report",
-      "enabled": true,
-      "clear_on_startup": false,
-      "save_only_uncaughtException": true
-    },
-    "browse_url": {
-      "launch_url": "",
-      "enabled": true
+      "pathToBlacklistFile": "./log/tiny-https-server/blacklist.json",
+      "bad_path_validation_regex_patterns": [
+        ".php$|.asmx$"
+      ],
+      "contact_email": "admin@localhost.local",
+      "pathToPrivkey": "D:\\Manuel\\source\\repos\\manupro_2.0\\tiny-https-server\\tiny-https-server\\cert\\localhost-key.pem",
+      "pathToCert": "D:\\Manuel\\source\\repos\\manupro_2.0\\tiny-https-server\\tiny-https-server\\cert\\localhost-cert.pem"
     }
   },
-  "development": {
-    "tiny_https_server": {
-      "port": 80,
-      "subdomains": {
-        "test": {
-          "document_root": "./public/test"
-        }
-      }
-    },
-    "try_to_run": {
-      "enabled": false
-    },
-    "log_report": {
-      "logDir": "./log/log-report",
-      "enabled": true,
-      "clear_on_startup": true,
-      "save_only_uncaughtException": false
-    },
-    "browse_url": {
-      "launch_url": "https://localhost/",
-      "enabled": true
-    }
-  }
+  "development": {}
 }

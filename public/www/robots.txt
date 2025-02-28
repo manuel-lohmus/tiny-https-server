@@ -1,0 +1,6 @@
+﻿User-agent: *
+Sitemap: /sitemap.xml
+Allow: /
+Disallow: /*.pdf$
+Disallow: /*.json$
+Disallow: /*.md$

@@ -1,4 +1,4 @@
-module.exports = {
+﻿module.exports = {
     ".3dm": "x-world/x-3dmf",
     ".3dmf": "x-world/x-3dmf",
     ".a": "application/octet-stream",
@@ -450,4 +450,6 @@ module.exports = {
     ".zip": "application/x-compressed",
     ".zoo": "application/octet-stream",
     ".zsh": "text/x-script.zsh",
+
+    ".manifest": "application/manifest+json;charset=UTF-8"
 };

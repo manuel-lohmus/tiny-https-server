@@ -1,4 +1,4 @@
-'use strict';
+﻿/**  Copyright (c) 2024, Manuel Lõhmus (MIT License). */
 
 if ('serviceWorker' in navigator) {
 
@@ -10,15 +10,10 @@ if ('serviceWorker' in navigator) {
 
             if (e.target.state === 'redundant') {
 
-                fetch('/$service_worker_version').then(function (response) {
+                if (confirm('Progressive Web App new version.\nReloading is recommended.')) {
 
-                    response.text().then(function (version) {
-
-                        if (confirm("New version: " + version + "\nReloading is recommended.")) {
-                            location.reload();
-                        }
-                    });
-                });
+                    location.reload();
+                }
             }
         });
     }
