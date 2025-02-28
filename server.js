@@ -547,7 +547,7 @@ function _emit(eventName, req, res) {
         }
 
         // remove from blacklist if the last interval is more than 1 day
-        if (blacklist[ip]?.status === "watching" && blacklist[ip]?.last_interval.includes("days")) {
+        if (blacklist[ip]?.status === "watching" && blacklist[ip]?.last_interval?.includes("days")) {
 
             blacklist[ip] = null;
         }

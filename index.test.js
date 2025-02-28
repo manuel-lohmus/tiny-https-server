@@ -10,7 +10,7 @@ configSets.isSaveChanges = false;
 
 var cluster = WebCluster({
         isDebug: true,
-        parallelism: 'auto 2',
+        parallelism: 'auto',
         host: 'localhost',
         port: 80,
         primary_domain: {
