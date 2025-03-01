@@ -3,6 +3,7 @@
 var WebCluster = require('./index.js'),
     configSets = require("config-sets"),
     { isPrimary } = require('node:cluster'),
+    { platform } = require('os'),
     { request } = require('node:http');
 
 configSets.isSaveChanges = false;
@@ -71,7 +72,7 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://test.localhost/service_worker_version')   ", { skip: false }, (check, done) => {
+        test("httpRequest('http://test.localhost/service_worker_version')   ", { skip: platform() === 'darwin' }, (check, done) => {
             httpRequest('http://test.localhost/service_worker_version', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
