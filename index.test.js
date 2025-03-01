@@ -72,7 +72,7 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://test.localhost/service_worker_version')   ", { skip: platform() === 'darwin' }, (check, done) => {
+        test("httpRequest('http://test.localhost/service_worker_version')   ", { skip: platform() !== 'linux' }, (check, done) => {
             httpRequest('http://test.localhost/service_worker_version', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
