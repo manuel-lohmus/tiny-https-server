@@ -8,22 +8,22 @@ var WebCluster = require('./index.js'),
 configSets.isSaveChanges = false;
 
 var cluster = WebCluster({
-        isDebug: true,
-        parallelism: 'auto',
-        host: 'localhost',
-        port: 3000,
-        primary_domain: {
-            service_worker_version: "1",
-            is_new_service_worker_reload_browser: true
-        },
-        subdomains: {
-            "test.localhost": {
-                document_root: "./public/test",
-                service_worker_version: "0"
-            }
-        },
-        contact_email: 'admin@localhost.local'
+    isDebug: true,
+    parallelism: 1,
+    host: 'localhost',
+    port: 3000,
+    primary_domain: {
+        service_worker_version: "1",
+        is_new_service_worker_reload_browser: true
     },
+    subdomains: {
+        "test.localhost": {
+            document_root: "./public/test",
+            service_worker_version: "0"
+        }
+    },
+    contact_email: 'admin@localhost.local'
+},
 
     function _initServer(server) {
         /*debugger;*/
@@ -49,13 +49,13 @@ var cluster = WebCluster({
     }
 );
 
-if (isPrimary) { setTimeout(test, 10000); }
+if (isPrimary) { setTimeout(test, 5000); }
 
 
 function test() {
 
     testRunner("TESTS for tiny-https-server", { skip: false }, (test) => {
-        test("httpRequest('http://localhost/heavy')                      ", { skip: false, timeout: 15000 }, (check, done) => {
+        test("httpRequest('http://localhost/heavy')                         ", { skip: false, timeout: 15000 }, (check, done) => {
             httpRequest('http://localhost/heavy', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
@@ -63,7 +63,7 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://localhost/service_worker_version')     ", { skip: false }, (check, done) => {
+        test("httpRequest('http://localhost/service_worker_version')        ", { skip: false }, (check, done) => {
             httpRequest('http://localhost/service_worker_version', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
@@ -71,7 +71,7 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://test.localhost/service_worker_version')", { skip: false }, (check, done) => {
+        test("httpRequest('http://test.localhost/service_worker_version')   ", { skip: false }, (check, done) => {
             httpRequest('http://test.localhost/service_worker_version', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
@@ -79,7 +79,7 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://localhost/service_worker')             ", { skip: false }, (check, done) => {
+        test("httpRequest('http://localhost/service_worker')                ", { skip: false }, (check, done) => {
             httpRequest('http://localhost/service_worker', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
@@ -87,7 +87,7 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://localhost/.well-known/blacklist')      ", { skip: false }, (check, done) => {
+        test("httpRequest('http://localhost/.well-known/blacklist')         ", { skip: false }, (check, done) => {
             httpRequest('http://localhost/.well-known/blacklist', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
@@ -95,7 +95,7 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://localhost/.well-known/traffic-advice') ", { skip: false }, (check, done) => {
+        test("httpRequest('http://localhost/.well-known/traffic-advice')    ", { skip: false }, (check, done) => {
             httpRequest('http://localhost/.well-known/traffic-advice', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
@@ -103,7 +103,7 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://localhost/.well-known/security.txt')   ", { skip: false }, (check, done) => {
+        test("httpRequest('http://localhost/.well-known/security.txt')      ", { skip: false }, (check, done) => {
             httpRequest('http://localhost/.well-known/security.txt', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
@@ -111,7 +111,7 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://localhost/favicon-192x192.png')        ", { skip: false }, (check, done) => {
+        test("httpRequest('http://localhost/favicon-192x192.png')           ", { skip: false }, (check, done) => {
             httpRequest('http://localhost/favicon-192x192.png', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
@@ -119,7 +119,7 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://localhost/favicon-512x512.png')        ", { skip: false }, (check, done) => {
+        test("httpRequest('http://localhost/favicon-512x512.png')           ", { skip: false }, (check, done) => {
             httpRequest('http://localhost/favicon-512x512.png', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
@@ -127,7 +127,7 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://localhost/favicon.ico')                ", { skip: false }, (check, done) => {
+        test("httpRequest('http://localhost/favicon.ico')                   ", { skip: false }, (check, done) => {
             httpRequest('http://localhost/favicon.ico', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
@@ -135,7 +135,7 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://localhost/index.html')                 ", { skip: false }, (check, done) => {
+        test("httpRequest('http://localhost/index.html')                    ", { skip: false }, (check, done) => {
             httpRequest('http://localhost/index.html', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
@@ -143,15 +143,15 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://localhost/pwa.manifest')               ", { skip: false }, (check, done) => {
-            httpRequest('http://localhost/pwa.manifest', function (err, res) {
+        test("httpRequest('http://localhost/manifest.webmanifest')          ", { skip: false }, (check, done) => {
+            httpRequest('http://localhost/manifest.webmanifest', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
                 check('data', res.data).mustInclude('"start_url":');
                 done();
             });
         });
-        test("httpRequest('http://localhost/robots.txt')                 ", { skip: false }, (check, done) => {
+        test("httpRequest('http://localhost/robots.txt')                    ", { skip: false }, (check, done) => {
             httpRequest('http://localhost/robots.txt', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
@@ -159,7 +159,7 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://localhost/sitemap.xml')                ", { skip: false }, (check, done) => {
+        test("httpRequest('http://localhost/sitemap.xml')                   ", { skip: false }, (check, done) => {
             httpRequest('http://localhost/sitemap.xml', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
@@ -167,7 +167,15 @@ function test() {
                 done();
             });
         });
-        test("httpRequest('http://localhost/index.php')                  ", { skip: false, timeout: 15000 }, (check, done) => {
+        test("httpRequest('http://localhost/node_modules/tiny-https-server')", { skip: false }, (check, done) => {
+            httpRequest('http://localhost/node_modules/tiny-https-server', function (err, res) {
+                if (err) { done(err); return; }
+                check('status', res.status).mustBe(200);
+                check('data', res.data).mustInclude('serviceWorker');
+                done();
+            });
+        });
+        test("httpRequest('http://localhost/index.php')                     ", { skip: false, timeout: 15000 }, (check, done) => {
             httpRequest('http://localhost/index.php', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(400);
@@ -191,11 +199,11 @@ function test() {
     function httpRequest(url, cb) {
 
         var req = request(url, { port: cluster.serverOptions.port }, function (res) {
-            
+
             res.data = '';
             res.on('data', function (chunk) { res.data += chunk; });
             res.on('end', function () {
-                
+
                 cb(null, {
                     url,
                     status: res.statusCode,

@@ -40,7 +40,8 @@ var blacklist_blocking_from = 100,
             service_worker_version: '0',
             is_new_service_worker_reload_browser: false,
             precache_urls: [],
-            headers: { default: { server: "tiny-https-server" } }
+            headers: { default: { server: "tiny-https-server" } },
+            sitemap_update: true
         },
         subdomains: {},
         cache_control: {
@@ -119,6 +120,37 @@ function createHttpServer(options = {}, isHttpToHttps = false) {
         }
     });
 
+    // primary_document_root sitemap.xml
+    if (configSets.isSaveChanges && serverOptions.primary_domain.sitemap_update) {
+
+        var rootSitemapUpdateWaitTimeout;
+        fs.watch(_resolvePath(serverOptions.primary_domain.document_root), function (eventType, filename) {
+
+            if (!fs.existsSync(_resolvePath(serverOptions.primary_domain.document_root)) || filename.endsWith('sitemap.xml')) {
+
+                return;
+            }
+
+            clearTimeout(rootSitemapUpdateWaitTimeout);
+            rootSitemapUpdateWaitTimeout = setTimeout(function () {
+                
+                fs.writeFileSync(
+                    path.join(_resolvePath(serverOptions.primary_domain.document_root), 'sitemap.xml'),
+                    `<?xml version="1.0" encoding="utf-8" ?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>/</loc>
+    <lastmod>${new Date().toISOString().split('.').shift() + '+00:00'}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>`,
+                    { encoding: 'utf8', mode: 0o777 }
+                );
+            }, 1000);
+        });
+    }
+
     return server;
 }
 
@@ -156,13 +188,13 @@ function createHttpsServer(options = {}) {
         server.listen(options, listenCallback);
     });
 
-    var waitCertUpdatedTimeout;
+    var certUpdateWaitTimeout;
     fs.watch(path.dirname(options.pathToCert), function (eventType, filename) {
 
         if (!fs.existsSync(options.pathToPrivkey) || !fs.existsSync(options.pathToCert)) { return; }
 
-        clearTimeout(waitCertUpdatedTimeout);
-        waitCertUpdatedTimeout = setTimeout(function () {
+        clearTimeout(certUpdateWaitTimeout);
+        certUpdateWaitTimeout = setTimeout(function () {
 
             server.setSecureContext({
                 key: fs.readFileSync(options.pathToPrivkey),
@@ -804,41 +836,44 @@ function _node_modules_request(req, res, next) {
 
     if (req.url.startsWith("/node_modules") && req.method.toLocaleUpperCase() === "GET") {
 
-        var server = this;
-        var filename = req.url.split("?").shift().split("/")
-            .filter(function (v) { return v; })
-            .map(function (v) { return v.split("@").shift(); })
-            .join("/");
+        var server = this,
+            modulePaths = req.url.split("/").filter(function (v) { return v; }),
+            [moduleName, moduleVersion] = modulePaths[1].split("@"),
+            packagePath = path.join(process.cwd(), "node_modules", moduleName, "package.json"),
+            packageInfo = null;
 
-        fs.readFile(path.join(process.cwd(), filename, "package.json"), function (err, data) {
+        modulePaths[1] = moduleName;
 
-            if (!err) {
+        if (fs.existsSync(packagePath)) { packageInfo = require(packagePath); }
+        if (modulePaths.length === 2 && packageInfo) { modulePaths.push(packageInfo.browser || packageInfo.main); }
 
-                try {
+        if (moduleVersion && packageInfo?.version && !packageInfo.version.startsWith(moduleVersion)) {
 
-                    var pk = JSON.parse(data);
-                    filename = path.join(process.cwd(), filename, pk.browser || pk.main);
-                }
-                catch (e) {
+            _not_found_content.call(server, req, res);
 
-                    err = e;
-                }
+            return;
+        }
+
+        _static_file.call(server, path.join(process.cwd(), ...modulePaths), res, function () {
+
+            // /node_modules/tiny-https-server/
+            if (moduleName === "tiny-https-server" && modulePaths.length === 2) {
+
+                _static_file.call(server, path.join(process.cwd(), "browser.js"), res, function () {
+
+                    _not_found_content.call(server, req, res);
+                });
+
+                return;
             }
 
-            if (filename.endsWith("node_modules/tiny-https-server")) { filename = "browser.js" }
-
-            if (err) { filename = path.join(__dirname, filename); }
-
-            _static_file.call(server, filename, res, function () {
-
-                _not_found_content.call(server, req, res);
-            });
+            _not_found_content.call(server, req, res);
         });
-    }
-    else {
 
-        next();
+        return;
     }
+
+    next();
 }
 /**
  * @param {http.IncomingMessage} req

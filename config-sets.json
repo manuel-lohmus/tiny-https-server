@@ -22,7 +22,8 @@
           "default": {
             "server": "tiny-https-server"
           }
-        }
+        },
+        "sitemap_update": true
       },
       "subdomains": {},
       "cache_control": {
