@@ -38,6 +38,7 @@ var blacklist_blocking_from = 100,
         primary_domain: {
             document_root: './public/www',
             service_worker_version: '0',
+            service_worker_version_update: true,
             is_new_service_worker_reload_browser: false,
             precache_urls: [],
             headers: { default: { server: "tiny-https-server" } },
@@ -120,8 +121,8 @@ function createHttpServer(options = {}, isHttpToHttps = false) {
         }
     });
 
-    // primary_document_root sitemap.xml
-    if (configSets.isSaveChanges && serverOptions.primary_domain.sitemap_update) {
+    // watch primary_document_root
+    if (configSets.isSaveChanges) {
 
         var rootSitemapUpdateWaitTimeout;
         fs.watch(_resolvePath(serverOptions.primary_domain.document_root), function (eventType, filename) {
@@ -133,10 +134,27 @@ function createHttpServer(options = {}, isHttpToHttps = false) {
 
             clearTimeout(rootSitemapUpdateWaitTimeout);
             rootSitemapUpdateWaitTimeout = setTimeout(function () {
-                
-                fs.writeFileSync(
-                    path.join(_resolvePath(serverOptions.primary_domain.document_root), 'sitemap.xml'),
-                    `<?xml version="1.0" encoding="utf-8" ?>
+
+                if (serverOptions.primary_domain.sitemap_update) {
+
+                    updateSitemapXml();
+                }
+
+                if (serverOptions.primary_domain.service_worker_version_update) {
+
+                    serverOptions.primary_domain.service_worker_version = new Date().toISOString().split('.').shift();
+                }
+            }, 1000);
+        });
+    }
+
+    return server;
+
+    function updateSitemapXml() {
+
+        fs.writeFileSync(
+            path.join(_resolvePath(serverOptions.primary_domain.document_root), 'sitemap.xml'),
+            `<?xml version="1.0" encoding="utf-8" ?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>/</loc>
@@ -145,13 +163,9 @@ function createHttpServer(options = {}, isHttpToHttps = false) {
     <priority>1.0</priority>
   </url>
 </urlset>`,
-                    { encoding: 'utf8', mode: 0o777 }
-                );
-            }, 1000);
-        });
+            { encoding: 'utf8', mode: 0o777 }
+        );
     }
-
-    return server;
 }
 
 /**
@@ -162,7 +176,7 @@ function createHttpsServer(options = {}) {
 
     options = configSets.assign(serverOptions, options, true);
 
-    if (!options.port || options.port === 80) { options.port = 443;}
+    if (!options.port || options.port === 80) { options.port = 443; }
     if (!options.pathToPrivkey) { options.pathToPrivkey = path.join(__dirname, "./cert/localhost-key.pem"); }
     if (!options.pathToCert) { options.pathToCert = path.join(__dirname, "./cert/localhost-cert.pem"); }
 
@@ -742,20 +756,11 @@ function _service_worker_version_request(req, res) {
 
     if (req.method.toLocaleUpperCase() === "GET") {
 
-        if (_service_worker_version_request.host_version?.[req.headers.host]) {
-
-            return response(_service_worker_version_request.host_version[req.headers.host]);
-        }
-
-        var { host, service_worker_version } = _get_host_settings(req.headers.host, this.options);
+        var { host, service_worker_version } = _get_host_settings(req.headers.host, this.options, false);
 
         //*** Service Worker Version ***
         if ((!host || this.options.subdomains[host])
             && req.method.toLocaleUpperCase() === "GET") {
-
-            if (!_service_worker_version_request.host_version) { _service_worker_version_request.host_version = {}; }
-
-            _service_worker_version_request.host_version[req.headers.host] = service_worker_version;
 
             return response(service_worker_version);
         }
@@ -784,8 +789,7 @@ function _service_worker_request(req, res) {
 
         if (isSSL && !isClientSSL) {
 
-            return response(`/**  Copyright (c) 2024, Manuel Lõhmus (EUPL License). */
-
+            return response(`
 self.addEventListener('install', (event) => {
 	event.waitUntil(
 		caches.keys().then(cachesToDelete => {
@@ -801,25 +805,17 @@ self.addEventListener('install', (event) => {
             `);
         }
 
-        if (_service_worker_request.host_code?.[req.headers.host]) {
-
-            return response(_service_worker_request.host_code[req.headers.host]);
-        }
-
-        var settings = _get_host_settings(req.headers.host, this.options);
+        var settings = _get_host_settings(req.headers.host, this.options, false);
 
         //*** Service Worker Strict ***
         if ((!settings.host || this.options.subdomains[settings.host])) {
 
-            if (!_service_worker_request.host_code) { _service_worker_request.host_code = {}; }
-
-            _service_worker_request.host_code[req.headers.host] = _getServiceWorkerCode(settings);
-
-            return response(_service_worker_request.host_code[req.headers.host]);
+            return response(_getServiceWorkerCode(settings));
         }
     }
 
     return _not_found_content.call(this, req, res);
+
 
     function response(code) {
 
@@ -908,9 +904,9 @@ function _static_request(req, res) {
  * @param {string} host
  * @returns {{host:string,document_root:string}}
  */
-function _get_host_settings(host, options) {
+function _get_host_settings(host, options, cached = true) {
 
-    if (_get_host_settings.host_settings?.[host]) { return _get_host_settings.host_settings[host]; }
+    if (cached && _get_host_settings.host_settings?.[host]) { return _get_host_settings.host_settings[host]; }
 
     var _host = host,
         document_root = "",
@@ -1487,7 +1483,7 @@ function _getCachingFilesToString(precache_urls, document_root) {
 ]`;
 }
 function _getFiles(fsPath) {
-    
+
     if (!fs.lstatSync(fsPath).isDirectory()) { return [fsPath]; }
 
     return fs.readdirSync(fsPath).reduce(function (filesPath, name) {
