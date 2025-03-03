@@ -409,6 +409,8 @@
     ".wmlc": "application/vnd.wap.wmlc",
     ".wmls": "text/vnd.wap.wmlscript",
     ".wmlsc": "application/vnd.wap.wmlscriptc",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
     ".word": "application/msword",
     ".wp": "application/wordperfect",
     ".wp5": "application/wordperfect",

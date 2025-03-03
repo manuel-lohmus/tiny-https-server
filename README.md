@@ -76,7 +76,7 @@ consr cluster = WebCluster({
 - acme-challenge support for letsencrypt
 - test self-signed certificate support
 - configurable in JSON format file `config-sets.json`
-- command line support example: `tiny-https-server --help` or `tiny-https-server --parallelism='auto 1' --open` 
+- command line support example: `tiny-https-server --help` or `tiny-https-server --parallelism='auto 1'` 
 
 ## Installation
 

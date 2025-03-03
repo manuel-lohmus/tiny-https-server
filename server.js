@@ -833,7 +833,7 @@ function _node_modules_request(req, res, next) {
     if (req.url.startsWith("/node_modules") && req.method.toLocaleUpperCase() === "GET") {
 
         var server = this,
-            modulePaths = req.url.split("/").filter(function (v) { return v; }),
+            modulePaths = req.url.split('?').shift().split("/").filter(function (v) { return v; }),
             [moduleName, moduleVersion] = modulePaths[1].split("@"),
             packagePath = path.join(process.cwd(), "node_modules", moduleName, "package.json"),
             packageInfo = null;
