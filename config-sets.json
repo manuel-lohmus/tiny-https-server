@@ -48,8 +48,13 @@
         ".php$|.asmx$"
       ],
       "contact_email": "admin@localhost.local",
+      "maxHeaderSize": 1024,
       "pathToPrivkey": "D:\\Manuel\\source\\repos\\manupro_2.0\\tiny-https-server\\tiny-https-server\\cert\\localhost-key.pem",
       "pathToCert": "D:\\Manuel\\source\\repos\\manupro_2.0\\tiny-https-server\\tiny-https-server\\cert\\localhost-cert.pem"
+    },
+    "web-cluster": {
+      "isDebug": true,
+      "parallelism": "auto 2"
     }
   },
   "development": {}

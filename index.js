@@ -38,7 +38,6 @@ function WebCluster(
         isSSL = false,
         webCluster = Object.create(null, {
             isSSL: { get: function () { return isSSL; }, configurable: false, enumerable: false },
-            options: { get: function () { return options; }, configurable: false, enumerable: false },
             clusterOptions: { get: function () { return clusterOptions; }, configurable: false, enumerable: false },
             serverOptions: { get: function () { return serverOptions; }, configurable: false, enumerable: false },
             serverHttpToHttps: { value: null, writable: true, configurable: false, enumerable: false },

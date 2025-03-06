@@ -699,28 +699,30 @@ function _log(req, res) {
 
     function _setLogfileName() {
 
-        var date = new Date();
-        var year = date.getUTCFullYear();
-        var month = date.getUTCMonth() + 1 < 10 ? `0${date.getUTCMonth() + 1}` : date.getUTCMonth() + 1;
-        var day = date.getUTCDate() < 10 ? `0${date.getUTCDate()}` : date.getUTCDate();
-        this.logFileName = path.join(process.cwd(), this.options.logDir, year + "-" + month + "-" + day + ".log");
+        var self = this,
+            date = new Date(),
+            year = date.getUTCFullYear(),
+            month = date.getUTCMonth() + 1 < 10 ? `0${date.getUTCMonth() + 1}` : date.getUTCMonth() + 1,
+            day = date.getUTCDate() < 10 ? `0${date.getUTCDate()}` : date.getUTCDate();
 
-        if (!fs.existsSync(path.dirname(this.logFileName))) {
+        self.logFileName = path.join(process.cwd(), self.options.logDir, year + "-" + month + "-" + day + ".log");
 
-            fs.mkdirSync(path.dirname(this.logFileName), { recursive: true });
+        if (!fs.existsSync(path.dirname(self.logFileName))) {
+
+            fs.mkdirSync(path.dirname(self.logFileName), { recursive: true });
         }
 
 
         var night = new Date(
-            date.getFullYear(),
-            date.getMonth(),
-            date.getDate() + 1, // the next day, ...
+            date.getUTCFullYear(),
+            date.getUTCMonth(),
+            date.getUTCDate() + 1, // the next day, ...
             0, 0, 0 // ...at 00:00:00 hours
         );
 
         setTimeout(function () {
 
-            _setLogfileName.call(this);
+            _setLogfileName.call(self);
         },
             night.getTime() - date.getTime()
         );
