@@ -1,3 +1,6 @@
+
+/**  Copyright (c) 2024, Manuel Lõhmus (MIT License). */
+
 'use strict';
 
 var blacklist_blocking_from = 100,
@@ -122,7 +125,7 @@ function createHttpServer(options = {}, isHttpToHttps = false) {
     });
 
     // watch primary_document_root
-    if (configSets.isSaveChanges) {
+    if (configSets.enableFileReadWrite) {
 
         var rootSitemapUpdateWaitTimeout;
         fs.watch(_resolvePath(serverOptions.primary_domain.document_root), function (eventType, filename) {
@@ -670,7 +673,7 @@ function _autoScaling() {
 }
 function _log(req, res) {
 
-    if (!configSets.isSaveChanges) { return; }
+    if (!configSets.enableFileReadWrite || !this.options.logDir) { return; }
 
     if (!this.logFileName) { _setLogfileName.call(this); }
 
@@ -1362,7 +1365,7 @@ function _watchJsonFile(filePath, data = {}) {
 
         timeout = setTimeout(() => {
 
-            if (!data.isChanged || isFileWriteInProgress || !configSets.isSaveChanges) { return; }
+            if (!data.isChanged || isFileWriteInProgress || !configSets.enableFileReadWrite) { return; }
 
             isFileWriteInProgress = true;
 
@@ -1420,19 +1423,19 @@ self.addEventListener('activate', event => {
 	);
 });
 self.addEventListener('fetch', function (event) {
-	var url = event.request.url.split("#").shift();
-	if (url.startsWith(self.location.origin)) {
-        if (new URL(url, self.location.origin).pathname === '/') { url += 'index.html' }
+	var url = new URL(event.request.url, self.location.origin);
+	if (url.origin === self.location.origin) {
+        if (url.pathname === '/') { url.pathname += 'index.html' }
 		event.respondWith(
-			caches.match(url).then(cachedResponse => {
-				if (navigator.onLine && /[:|?]/.test(url)) {
-					return fetch(new Request(url, { cache: 'no-cache' }));
+			caches.match(url + '').then(cachedResponse => {
+				if (navigator.onLine && (url.search || /[:]/.test(url.pathname))) {
+					return fetch(new Request(url + '', { cache: 'no-cache' }));
 				}
 				if (cachedResponse && cachedResponse.status === 200 && !cachedResponse.redirected) {
 					return cachedResponse;
 				}
 				return caches.open(RUNTIME).then(cache => {
-					return get_content(cache, url, cachedResponse?.redirected && cachedResponse.url);
+					return get_content(cache, url + '', cachedResponse?.redirected && cachedResponse.url);
 				});
 			})
 		);

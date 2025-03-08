@@ -3,29 +3,35 @@
   "production": {
     "web-cluster": {
       "isDebug": true,
-      "parallelism": "auto 2"
+      "parallelism": 1
     },
     "tiny-https-server": {
       "isDebug": true,
       "host": "localhost",
-      "port": 80,
+      "port": 3000,
       "exclusive": false,
       "maxHeaderSize": 1024,
       "logDir": "./log/tiny-https-server",
       "directory_index": "index.html",
       "primary_domain": {
         "document_root": "./public/www",
-        "service_worker_version": "0",
-        "is_new_service_worker_reload_browser": false,
+        "service_worker_version": "1",
+        "is_new_service_worker_reload_browser": true,
         "precache_urls": [],
         "headers": {
           "default": {
             "server": "tiny-https-server"
           }
         },
-        "sitemap_update": true
+        "sitemap_update": true,
+        "service_worker_version_update": true
       },
-      "subdomains": {},
+      "subdomains": {
+        "test.localhost": {
+          "document_root": "./public/test",
+          "service_worker_version": "0"
+        }
+      },
       "cache_control": {
         "fileTypes": {
           "webp": "max-age=2592000",
@@ -48,13 +54,8 @@
         ".php$|.asmx$"
       ],
       "contact_email": "admin@localhost.local",
-      "maxHeaderSize": 1024,
       "pathToPrivkey": "D:\\Manuel\\source\\repos\\manupro_2.0\\tiny-https-server\\tiny-https-server\\cert\\localhost-key.pem",
       "pathToCert": "D:\\Manuel\\source\\repos\\manupro_2.0\\tiny-https-server\\tiny-https-server\\cert\\localhost-cert.pem"
-    },
-    "web-cluster": {
-      "isDebug": true,
-      "parallelism": "auto 2"
     }
   },
   "development": {}

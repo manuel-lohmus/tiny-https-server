@@ -1,4 +1,7 @@
-﻿'use strict';
+﻿
+/**  Copyright (c) 2024, Manuel Lõhmus (MIT License). */
+
+'use strict';
 
 var configSets = require("config-sets"),
     { createHttpServer, createHttpsServer, availableLinks } = require('./server'),
