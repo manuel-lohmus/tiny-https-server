@@ -6,7 +6,7 @@
 var configSets = require("config-sets"),
     { createHttpServer, createHttpsServer, availableLinks } = require('./server'),
     { availableParallelism } = require('node:os'),
-    { isPrimary, isWorker, fork } = require('node:cluster'),
+    cluster = require('node:cluster'),
 
     clusterOptions = configSets('web-cluster', {
         isDebug: false,
@@ -45,7 +45,6 @@ function WebCluster(
             serverOptions: { get: function () { return serverOptions; }, configurable: false, enumerable: false },
             serverHttpToHttps: { value: null, writable: true, configurable: false, enumerable: false },
             web_workers: { get: function () { return web_workers; }, configurable: false, enumerable: false },
-            onworker: { value: null, writable: true, configurable: false, enumerable: false },
             availableLinks: { value: availableLinks, writable: false, configurable: false, enumerable: false },
         }),
         web_workers = [];
@@ -57,12 +56,32 @@ function WebCluster(
     serverOptions = configSets.assign(serverOptions, options, true);
 
     isSSL = (serverOptions.port === 80) ? false
-            : Boolean(serverOptions.key && serverOptions.cert || serverOptions.port === 443);
+        : Boolean(serverOptions.key && serverOptions.cert || serverOptions.port === 443);
 
 
-    if (isPrimary) {
+    if (cluster.isPrimary) {
 
         setImmediate(initWorkers);
+
+        cluster.on('fork', (worker) => {
+
+            pDebug(`workerType '${worker.workerType}' started.`);
+
+            var length = Object.keys(cluster.workers).length;
+
+            pDebug("workers.count", length);
+        });
+
+        cluster.on('exit', (worker, code, signal) => {
+
+            pDebug(`workerType '${worker.workerType}' died (`, signal || code, `).`);
+
+            var length = Object.keys(cluster.workers).length;
+
+            pDebug("workers.count", length);
+
+            if (!length) { initWorkers(); }
+        });
 
         return webCluster;
 
@@ -70,7 +89,7 @@ function WebCluster(
         function initWorkers() {
 
             var parallelism = isNaN(parseInt(clusterOptions.parallelism)) ? clusterOptions.parallelism : parseInt(clusterOptions.parallelism),
-                max_parallelism = availableParallelism() * 2,
+                max_parallelism = availableParallelism()/* * 2*/,
                 workersCount = 0;
 
             //create http to https
@@ -84,7 +103,6 @@ function WebCluster(
                 for (var i = 0; i < parallelism; i++) {
 
                     webCluster.web_workers.push(createWorker());
-                    if (webCluster.onworker) { webCluster.onworker(webCluster.web_workers[webCluster.web_workers.length - 1]); }
                 }
             }
             // parallelism is not a valid number
@@ -95,7 +113,6 @@ function WebCluster(
                 for (var i = 0; i < max_parallelism; i++) {
 
                     webCluster.web_workers.push(createWorker());
-                    if (webCluster.onworker) { webCluster.onworker(webCluster.web_workers[webCluster.web_workers.length - 1]); }
                 }
             }
             // parallelism is string 'auto' | 'auto 1'| 'auto 2' ...
@@ -115,7 +132,6 @@ function WebCluster(
                     for (var i = 0; i < start_parallelism; i++) {
 
                         webCluster.web_workers.push(createWorker('auto'));
-                        if (webCluster.onworker) { webCluster.onworker(webCluster.web_workers[webCluster.web_workers.length - 1]); }
                     }
                 }
                 // start_parallelism is not a number, creates core count workers
@@ -124,7 +140,6 @@ function WebCluster(
                     for (var i = 0; i < max_parallelism / 2; i++) {
 
                         webCluster.web_workers.push(createWorker('auto'));
-                        if (webCluster.onworker) { webCluster.onworker(webCluster.web_workers[webCluster.web_workers.length - 1]); }
                     }
                 }
             }
@@ -150,10 +165,11 @@ function WebCluster(
 
                     workersCount++;
 
-                    var worker = fork({ workerType, exclusive: serverOptions.exclusive });
+                    var worker = cluster.fork({ workerType, exclusive: serverOptions.exclusive });
+                    worker.workerType = workerType;
 
                     //pDebug(`Web Worker ${auto ? '(Auto Scaling up) ' : ''}starts:`, worker.id);
-                    pDebug("Start: Web Worker Count:", workersCount);
+                    //pDebug("Start: Web Worker Count:", workersCount);
 
                     worker.on('exit', (code) => {
 
@@ -162,7 +178,7 @@ function WebCluster(
                         if (code) {
 
                             //pDebug(`Web Worker ${auto ? '(Auto Scaling up) ' : ''}exit:`, worker.id);
-                            pDebug("Error: Web Worker Count:", workersCount);
+                            //pDebug("Error: Web Worker Count:", workersCount);
 
                             createWorker(workerType);
                         }
@@ -185,17 +201,18 @@ function WebCluster(
 
                         workersCount++;
 
-                        var worker = fork({ workerType: 'autoscaling', exclusive: serverOptions.exclusive });
+                        var worker = cluster.fork({ workerType: 'autoscaling', exclusive: serverOptions.exclusive });
+                        worker.workerType = 'autoscaling';
 
                         //pDebug("Scaled up: Web Worker starts:", worker.id);
-                        pDebug("Scaled up: Web Worker Count:", workersCount);
+                        //pDebug("Scaled up: Web Worker Count:", workersCount);
 
                         worker.on('exit', () => {
 
                             workersCount--;
 
                             //pDebug("Scaled down: Web Worker exit:", worker.id);
-                            pDebug("Scaled down: Web Worker Count:", workersCount);
+                            //pDebug("Scaled down: Web Worker Count:", workersCount);
                         });
 
                         worker.on('message', function (msg) {
@@ -224,7 +241,7 @@ function WebCluster(
         }
     }
 
-    else if (isWorker) {
+    else if (cluster.isWorker) {
 
         var workerType = process.env.workerType;
         serverOptions.exclusive = process.env.exclusive === 'true';
@@ -245,11 +262,11 @@ function WebCluster(
 
             var options = configSets.assign({}, serverOptions, true);
 
-            if (isAutoExit) { options.isAutoExit = true; }
-
             var server = isSSL
                 ? createHttpsServer(options)
                 : createHttpServer(options);
+
+            if (isAutoExit) { server.isAutoExit = true; }
 
             server.on("autoscaling", function () {
 

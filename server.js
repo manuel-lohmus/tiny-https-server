@@ -4,7 +4,7 @@
 'use strict';
 
 var blacklist_blocking_from = 100,
-    maxConnectionsForAutoScaling = 10,
+    maxConnectionsForAutoScaling = 2,
 
     fs = require("node:fs"),
     path = require("node:path"),
@@ -97,7 +97,7 @@ function createHttpServer(options = {}, isHttpToHttps = false) {
     server.emit = _emit;
 
 
-    _autoScaling.call(server);
+    setTimeout(function () { _autoScaling.call(server); });
 
     setImmediate(function () {
 
@@ -198,7 +198,7 @@ function createHttpsServer(options = {}) {
     server._emit = server.emit;
     server.emit = _emit;
 
-    _autoScaling.call(server);
+    setTimeout(function () { _autoScaling.call(server); });
 
     setImmediate(function () {
 
@@ -366,16 +366,24 @@ function _requestRedirectToHttps(req, res, next) {
 }
 function _well_known_traffic_advice(req, res) {
 
-    res.writeHead(200, {
-        "Content-Type": "application/trafficadvice+json",
-        "Cache-Control": "no-cache"
-    });
-    res.end(JSON.stringify(
-        [{
-            "user_agent": "prefetch-proxy",
-            "fraction": this.pendingRequests < 2 ? 0.8 : 0.2
-        }]
-    ));
+    if (this.isAutoExit || this.emittedAutoScaling) { return sendTrafficAdvice(true); }
+
+    sendTrafficAdvice();
+
+    function sendTrafficAdvice(isServerOccupied) {
+
+        res.writeHead(200, {
+            "Content-Type": "application/trafficadvice+json",
+            "Cache-Control": "no-cache"
+        });
+
+        res.end(JSON.stringify(
+            [{
+                "user_agent": "prefetch-proxy",
+                "fraction": isServerOccupied ? 0.2 : 0.8
+            }]
+        ));
+    }
 }
 function _well_known_security_txt(req, res) {
 
@@ -464,16 +472,6 @@ function _emit(eventName, req, res) {
 
     if (eventName === "request") {
 
-        // Auto Scaling
-        server.pendingRequests++;
-
-        if (server.pendingRequests > maxConnectionsForAutoScaling && !server.emittedAutoScaling) {
-
-            server.emittedAutoScaling = true;
-
-            server._emit("autoscaling", server.pendingRequests);
-        }
-
         setImmediate(function () {
 
             res.on('close', function () {
@@ -485,14 +483,6 @@ function _emit(eventName, req, res) {
                 }
 
                 _log.call(server, req, res);
-
-                // Auto Scaling
-                server.pendingRequests--;
-
-                if (server.emittedAutoScaling && server.pendingRequests < maxConnectionsForAutoScaling) {
-
-                    delete server.emittedAutoScaling;
-                }
             });
 
             var host_settings = _get_host_settings(req.headers.host, server.options);
@@ -634,25 +624,30 @@ function _emit(eventName, req, res) {
 function _autoScaling() {
 
     var server = this;
-    server.pendingRequests = 0;
 
+    var interval = setInterval(function () {
 
-    if (server.options.isAutoExit) {
+        server.getConnections(function (err, count) {
 
-        var interval = setInterval(function () {
+            if (err) { pError(err); }
 
-            //console.log("pendingRequests:", server.pendingRequests);
+            if (count) {
 
-            if (server.pendingRequests < 1) {
+                clearTimeout(scalingDown.timeout);
 
-                scalingDown.call(server);
+                if (count > maxConnectionsForAutoScaling && !server.emittedAutoScaling) {
+
+                    server.emittedAutoScaling = true;
+                    server._emit("autoscaling", count);
+                }
             }
             else {
 
-                clearTimeout(scalingDown.timeout);
+                server.emittedAutoScaling = false;
+                if (server.isAutoExit) { scalingDown.call(server); }
             }
-        }, 1000);
-    }
+        });
+    }, 1000);
 
     function scalingDown() {
 
@@ -660,15 +655,23 @@ function _autoScaling() {
 
         scalingDown.timeout = setTimeout(function () {
 
-            server.close(function (err) {
+            server.getConnections(function (err, count) {
 
                 if (err) { pError(err); }
-                process.exit(err ? 1 : 0);
+
+                if (count) { return; }
+
+                clearInterval(interval);
+
+                server.close(function (err) {
+
+                    if (err) { pError(err); }
+
+                    setTimeout(function () { process.exit(err ? 1 : 0); }, 10);
+                });
             });
 
-            scalingDown.call(server);
-
-        }, 10000);
+        }, 30000);
     }
 }
 function _log(req, res) {
@@ -1075,8 +1078,8 @@ function _static_file(filename, res, fn_not_found, subdomain) {
             // some amount of data has already been sent to the client.
             // The best we can do is terminate the response immediately
             // and log the error.
-            res.end();
             pError(err);
+            res.end();
         }
     }
 }
