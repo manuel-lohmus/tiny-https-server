@@ -1,5 +1,5 @@
-
-/**  Copyright (c) 2024, Manuel L�hmus (MIT License). */
+﻿
+/**  Copyright (c) 2024, Manuel Lõhmus (MIT License). */
 
 'use strict';
 
@@ -1426,23 +1426,24 @@ self.addEventListener('activate', event => {
 	);
 });
 self.addEventListener('fetch', function (event) {
-	var url = new URL(event.request.url, self.location.origin);
-	if (url.origin === self.location.origin) {
+    var url = new URL(event.request.url, self.location.origin);
+    if (url.origin === self.location.origin) {
         if (url.pathname === '/') { url.pathname += 'index.html' }
-		event.respondWith(
-			caches.match(url + '').then(cachedResponse => {
-				if (navigator.onLine && (url.search || /[:]/.test(url.pathname))) {
-					return fetch(new Request(url + '', { cache: 'no-cache' }));
-				}
-				if (cachedResponse && cachedResponse.status === 200 && !cachedResponse.redirected) {
-					return cachedResponse;
-				}
-				return caches.open(RUNTIME).then(cache => {
-					return get_content(cache, url + '', cachedResponse?.redirected && cachedResponse.url);
-				});
-			})
-		);
-	}
+        event.respondWith((async () => {
+            var precacheCache = await caches.open(PRECACHE);
+            var precacheResponse = await precacheCache.match(url);
+            if (precacheResponse) return precacheResponse;
+            var runtimeCache = await caches.open(RUNTIME);
+            var runtimeCacheResponse = await runtimeCache.match(url);
+            if (navigator.onLine && (url.search || /[:]/.test(url.pathname))) {
+                return fetch(new Request(url + '', { cache: 'no-cache' }));
+            }
+            if (runtimeCacheResponse && runtimeCacheResponse.status === 200 && !runtimeCacheResponse.redirected) {
+                return runtimeCacheResponse;
+            }
+            return get_content(runtimeCache, url + '', runtimeCacheResponse?.redirected && runtimeCacheResponse.url);
+        })());
+    }
 });
 function get_content(cache, url, redirectUrl, isPRECACHE) {
 
