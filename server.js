@@ -4,7 +4,7 @@
 'use strict';
 
 var blacklist_blocking_from = 100,
-    maxConnectionsForAutoScaling = 2,
+    maxConnectionsForAutoScaling = 3,
 
     fs = require("node:fs"),
     path = require("node:path"),
@@ -483,6 +483,7 @@ function _emit(eventName, req, res) {
                 }
 
                 _log.call(server, req, res);
+                req.destroy();
             });
 
             var host_settings = _get_host_settings(req.headers.host, server.options);
@@ -630,7 +631,7 @@ function _autoScaling() {
         server.getConnections(function (err, count) {
 
             if (err) { pError(err); }
-
+            
             if (count) {
 
                 clearTimeout(scalingDown.timeout);
@@ -647,7 +648,7 @@ function _autoScaling() {
                 if (server.isAutoExit) { scalingDown.call(server); }
             }
         });
-    }, 1000);
+    }, 10000);
 
     function scalingDown() {
 
