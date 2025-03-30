@@ -453,5 +453,6 @@
     ".zoo": "application/octet-stream",
     ".zsh": "text/x-script.zsh",
 
-    ".manifest": "application/manifest+json;charset=UTF-8"
+    ".manifest": "application/manifest+json;charset=UTF-8",
+    ".webmanifest": "application/manifest+json;charset=UTF-8"
 };

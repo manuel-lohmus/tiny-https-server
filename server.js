@@ -68,7 +68,7 @@ var blacklist_blocking_from = 100,
         },
         pathToBlacklistFile: './log/tiny-https-server/blacklist.json',
         bad_path_validation_regex_patterns: ['.php$|.asmx$'],
-        contact_email: 'admin@localhost'
+        contact_email: 'default@' + hostnames[0] //'default@localhost'
     }),
     blacklist = _watchJsonFile(_resolvePath(serverOptions.pathToBlacklistFile));
 
@@ -124,51 +124,18 @@ function createHttpServer(options = {}, isHttpToHttps = false) {
         }
     });
 
+    // watch node_modules
+    trackNodeModules();
+
     // watch primary_document_root
-    if (configSets.enableFileReadWrite) {
+    trackDirectoryServiceWorkerVersion(serverOptions.primary_domain);
 
-        var rootSitemapUpdateWaitTimeout;
-        fs.watch(_resolvePath(serverOptions.primary_domain.document_root), function (eventType, filename) {
-
-            if (!fs.existsSync(_resolvePath(serverOptions.primary_domain.document_root)) || filename.endsWith('sitemap.xml')) {
-
-                return;
-            }
-
-            clearTimeout(rootSitemapUpdateWaitTimeout);
-            rootSitemapUpdateWaitTimeout = setTimeout(function () {
-
-                if (serverOptions.primary_domain.sitemap_update) {
-
-                    updateSitemapXml();
-                }
-
-                if (serverOptions.primary_domain.service_worker_version_update) {
-
-                    serverOptions.primary_domain.service_worker_version = new Date().toISOString().split('.').shift();
-                }
-            }, 1000);
-        });
-    }
+    // watch subdomains
+    Object.keys(serverOptions.subdomains).forEach(function (host) {
+        trackDirectoryServiceWorkerVersion(serverOptions.subdomains[host]);
+    });
 
     return server;
-
-    function updateSitemapXml() {
-
-        fs.writeFileSync(
-            path.join(_resolvePath(serverOptions.primary_domain.document_root), 'sitemap.xml'),
-            `<?xml version="1.0" encoding="utf-8" ?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>/</loc>
-    <lastmod>${new Date().toISOString().split('.').shift() + '+00:00'}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-</urlset>`,
-            { encoding: 'utf8', mode: 0o777 }
-        );
-    }
 }
 
 /**
@@ -234,6 +201,102 @@ function createHttpsServer(options = {}) {
     }
 }
 
+/**
+ * Track the changes in 'node_modules' directory to update the Service Worker Version
+ * @returns {void}
+ */
+function trackNodeModules() {
+
+    if (configSets.enableFileReadWrite) {
+
+        var updateTimeout;
+        fs.watch('./node_modules', function (eventType, filename) {
+
+            if (!filename || filename.includes('/.')) { return; }
+
+            clearTimeout(updateTimeout);
+            updateTimeout = setTimeout(function () {
+
+                // update service worker version
+                updatedServiceWorkerVersion(serverOptions.primary_domain);
+
+                // update subdomains service worker version
+                Object.keys(serverOptions.subdomains).forEach(function (host) {
+
+                    updatedServiceWorkerVersion(serverOptions.subdomains[host]);
+                });
+            }, 10000);
+        });
+    }
+
+    function updatedServiceWorkerVersion(domainOptions) {
+
+        if (domainOptions.service_worker_version_update) {
+
+            domainOptions.service_worker_version = new Date().toISOString().split('.').shift();
+        }
+    }
+}
+/**
+ * Track the changes in the directory to update the Service Worker Version
+ * @param {DomainOptions} domainOptions
+ * @returns {void}
+ * 
+ * @typedef {Object} DomainOptions
+ * @property {string} document_root
+ * @property {boolean} sitemap_update
+ * @property {boolean} service_worker_version_update
+ */
+function trackDirectoryServiceWorkerVersion(domainOptions) {
+
+    if (configSets.enableFileReadWrite && domainOptions) {
+
+        var updateTimeout;
+        fs.watch(_resolvePath(domainOptions.document_root), updatedServiceWorkerVersion);
+    }
+
+    function updatedServiceWorkerVersion(eventType, filename) {
+
+        if (!filename ||
+            filename.includes('/.') ||
+            filename.endsWith('sitemap.xml') ||
+            !fs.existsSync(_resolvePath(domainOptions.document_root))) {
+
+            return;
+        }
+
+        clearTimeout(updateTimeout);
+        updateTimeout = setTimeout(function () {
+
+            if (domainOptions.sitemap_update) {
+
+                updateSitemapXml();
+            }
+
+            if (domainOptions.service_worker_version_update) {
+
+                domainOptions.service_worker_version = new Date().toISOString().split('.').shift();
+            }
+
+        }, 10000);
+    }
+    function updateSitemapXml() {
+
+        fs.writeFileSync(
+            path.join(_resolvePath(domainOptions.document_root), 'sitemap.xml'),
+            `<?xml version="1.0" encoding="utf-8" ?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>/</loc>
+    <lastmod>${new Date().toISOString().split('.').shift() + '+00:00'}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>`,
+            { encoding: 'utf8', mode: 0o777 }
+        );
+    }
+}
 /**
  * Info: https://nodejs.org/docs/latest/api/events.html#event-newlistener
  * @param {string} eventName - The name of the event being listened for
@@ -819,16 +882,19 @@ self.addEventListener('install', (event) => {
         //*** Service Worker Strict ***
         if ((!settings.host || this.options.subdomains[settings.host])) {
 
-            return response(_getServiceWorkerCode(settings));
+            return response(_getServiceWorkerCode(settings), settings);
         }
     }
 
     return _not_found_content.call(this, req, res);
 
 
-    function response(code) {
+    function response(code, settings) {
 
-        res.writeHead(200, { "Content-Type": "text/javascript; charset=UTF-8" });
+        res.writeHead(200, {
+            "Content-Type": "text/javascript; charset=UTF-8",
+            "ETag": '"' + code.length + "-" + settings.service_worker_version + '"'
+        });
         res.end(code);
     }
 }
@@ -1034,9 +1100,12 @@ function _static_file(filename, res, fn_not_found, subdomain) {
             if (cache_control && statusCode === 200) { headers["Cache-Control"] = cache_control; }
             else if (statusCode === 200) { headers["Cache-Control"] = "no-cache"; }
 
+            headers["Content-Length"] = stats.size;
+            headers["Last-Modified"] = stats.mtime.toUTCString();
+            headers["ETag"] = '"' + stats.size + "-" + Date.parse(stats.mtime) + '"';
+
             if (res.req.method.toLocaleUpperCase() === "HEAD") {
 
-                headers["Content-Length"] = stats.size;
                 res.writeHead(statusCode, headers);
                 res.end();
             }

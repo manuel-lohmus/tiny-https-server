@@ -29,7 +29,9 @@
       "subdomains": {
         "test.localhost": {
           "document_root": "./public/test",
-          "service_worker_version": "0"
+          "service_worker_version": "0",
+          "is_new_service_worker_reload_browser": false,
+          "precache_urls": null
         }
       },
       "cache_control": {

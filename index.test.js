@@ -1,4 +1,4 @@
-/**  Copyright (c) 2024, Manuel Lõhmus (MIT License). */
+ï»¿/**  Copyright (c) 2024, Manuel LÃµhmus (MIT License). */
 
 var WebCluster = require('./index.js'),
     configSets = require("config-sets"),
@@ -116,7 +116,7 @@ function test() {
             httpRequest('http://localhost/favicon-192x192.png', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
-                check('data', res.data.length).mustBe(9020);
+                check('data', res.data.length).mustBe(8734);
                 done();
             });
         });
@@ -124,7 +124,7 @@ function test() {
             httpRequest('http://localhost/favicon-512x512.png', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
-                check('data', res.data.length).mustBe(14037);
+                check('data', res.data.length).mustBe(23655);
                 done();
             });
         });
@@ -220,7 +220,7 @@ function test() {
 
 /**
  * Test runner. Function to run unit tests in the console.
- * @author Manuel Lõhmus 2024 (MIT License)
+ * @author Manuel LÃµhmus 2024 (MIT License)
  * @version 1.1.4
  * [2024-12-29] adde    d functionality to select tests by ID in the command line arguments (e.g. --testIDs=1 2 3)
  * @example `npm test '--'` or `node index.test.js`

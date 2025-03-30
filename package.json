@@ -1,6 +1,6 @@
 ﻿{
   "name": "tiny-https-server",
-  "version": "2.0.0-beta.12",
+  "version": "2.0.0-beta.14",
   "license": "MIT",
   "description": "Tiny web server with HTTPS support, static file serving, subdomain support, middleware support, and service worker support.",
   "keywords": [
@@ -65,7 +65,7 @@
   },
   "dependencies": {
     "config-sets": "^3.0.0-beta.9",
-    "data-context": "^2.0.0-beta.16"
+    "data-context": "^2.0.0-beta.17"
   },
   "devDependencies": {},
   "funding": "https://manuel-lohmus.github.io/tiny-https-server/README.html#license"
