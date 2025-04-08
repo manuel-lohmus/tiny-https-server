@@ -1,11 +1,11 @@
-﻿
+
 /**  Copyright (c) 2024, Manuel Lõhmus (MIT License). */
 
 'use strict';
 
 var configSets = require("config-sets"),
     { createHttpServer, createHttpsServer, availableLinks } = require('./server'),
-    { availableParallelism } = require('node:os'),
+    os = require('node:os'),
     cluster = require('node:cluster'),
 
     clusterOptions = configSets('web-cluster', {
@@ -89,7 +89,7 @@ function WebCluster(
         function initWorkers() {
 
             var parallelism = isNaN(parseInt(clusterOptions.parallelism)) ? clusterOptions.parallelism : parseInt(clusterOptions.parallelism),
-                max_parallelism = availableParallelism()/* * 2*/,
+                max_parallelism = os.availableParallelism?.() || os.cpus().length,
                 workersCount = 0;
 
             //create http to https

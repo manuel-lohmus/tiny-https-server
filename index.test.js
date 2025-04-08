@@ -1,4 +1,4 @@
-﻿/**  Copyright (c) 2024, Manuel Lõhmus (MIT License). */
+/**  Copyright (c) 2024, Manuel Lõhmus (MIT License). */
 
 var WebCluster = require('./index.js'),
     configSets = require("config-sets"),

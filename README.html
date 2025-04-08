@@ -1262,6 +1262,7 @@
 <li><a href="#installation">Installation</a></li>
 <li><a href="#testing">Testing</a></li>
 <li><a href="#how-to-use">How to use</a></li>
+<li><a href="#lets-encrypt-support">Let's Encrypt support</a></li>
 <li><a href="#license">License</a></li>
 </ul>
 </li>
@@ -1295,14 +1296,15 @@ Yor can mount the express.js style middleware to the server. Example:</p>
 <pre><code class="language-javascript">const WebCluster = require('tiny-https-server');
 const express = require('express');
 const admin = express();
-admin.get('/', (req, res) =&gt; {
-  res.send('Admin Homepage');
-});
+admin.get('/', (req, res) =&gt; { res.send('Admin Homepage'); });
 consr cluster = WebCluster({
     //isDebug: true,
     parallelism: 'auto 2'
 }, function _initServer(server) {
-    server.addRequest({ path: '/admin' }, admin);
+    // Mount express.js style middleware to the server under /admin path, url: 'http://localhost/admin' or 'http://yourdomain.com/admin'
+    server.addRequest({ path: '/admin/*' }, admin);
+    // Mount express.js style middleware to the server under admin subdomain, url: 'http://admin.localhost' or 'http://admin.yourdomain.com'
+    server.addRequest({ host: 'admin' }, admin); 
 });
 </code></pre>
 <h2 id="features">Features</h2>
@@ -1324,18 +1326,20 @@ consr cluster = WebCluster({
 <li>acme-challenge support for letsencrypt</li>
 <li>test self-signed certificate support</li>
 <li>configurable in JSON format file <code>config-sets.json</code></li>
-<li>command line support example: <code>tiny-https-server --help</code> or <code>tiny-https-server --parallelism='auto 1'</code></li>
+<li>command line support, example: <code>tiny-https-server --help</code> or <code>tiny-https-server --parallelism='auto 1'</code></li>
 </ul>
 <h2 id="installation">Installation</h2>
-<p>You can install <code>tiny-https-server</code> using this command:</p>
+<p>You can install 'tiny-https-server' using this command:</p>
 <p><code>npm install tiny-https-server</code></p>
+<p>You can also install 'tiny-https-server' globally using this command:</p>
+<p><code>npm install -g tiny-https-server</code></p>
 <h2 id="testing">Testing</h2>
-<p>You can test <code>tiny-https-server</code> on your system using this command:</p>
+<p>You can test 'tiny-https-server' on your system using this command:</p>
 <p><code>node ./node_modules/tiny-https-server/index.test</code></p>
-<p>or in the <code>tiny-https-server</code> project directory:</p>
+<p>or in the 'tiny-https-server' project directory:</p>
 <p><code>npm test</code></p>
 <h2 id="how-to-use">How to use</h2>
-<p>You can use <code>tiny-https-server</code> in your project like this:</p>
+<p>You can use 'tiny-https-server' in your project like this:</p>
 <pre><code class="language-javascript">const WebCluster = require('tiny-https-server');
 
 consr cluster = WebCluster({
@@ -1345,7 +1349,7 @@ consr cluster = WebCluster({
     // Add a request handler for the /hello path
     server.on('request', (req, res, next) =&gt; {
     
-        if (req.url === '/hello') {
+        if (req.url.startsWith('/hello')) {
 
             res.writeHead(200, { 'Content-Type': 'text/plain' });
             res.end('Hello World');
@@ -1356,6 +1360,59 @@ consr cluster = WebCluster({
     });
 });
 </code></pre>
+<br>
+<p>You can create a separate initServer.js file and use it like this:</p>
+<pre><code class="language-javascript">const WebCluster = require('tiny-https-server');
+const initServer = require('./initServer.js');
+const cluster = WebCluster({
+    isDebug: true, // Enable debug mode to see logs in the console
+    parallelism: 'auto 2' // Start 2 workers and scale up and down automatically
+}, initServer);
+</code></pre>
+<br>
+<p>in <code>initServer.js</code> file:</p>
+<pre><code class="language-javascript">module.exports = function _initServer(server) {
+    // Add your own code here
+    // This function is called when the server is initialized
+    // For example, you can add request handlers, middleware, etc.
+    const express = require('express');
+    const admin = express();
+    admin.get('/', (req, res) =&gt; { res.send('Admin Homepage'); });
+    // Mount express.js style middleware to the server under /admin path, url: 'http://localhost/admin' or 'http://yourdomain.com/admin'
+    server.addRequest({ path: '/admin/*' }, admin);
+    // Mount express.js style middleware to the server under admin subdomain, url: 'http://admin.localhost' or 'http://admin.yourdomain.com'
+    server.addRequest({ host: 'admin' }, admin);
+};
+</code></pre>
+<br>
+<p>If you install 'tiny-https-server' globally, can use command line like this:</p>
+<pre><code class="language-bash">tiny-https-server --port=8080 --host=localhost --docroot=./public --parallelism=auto 2 --isDebug=true
+</code></pre>
+<h2 id="lets-encrypt-support">Let's Encrypt support</h2>
+<p>'tiny-https-server' supports Let's Encrypt for obtaining free SSL certificates.<br>
+This allows you to use HTTPS on your server without having to pay for a certificate.<br>
+How to add Let's Encrypt support using Certbot &gt; webroot method:</p>
+<ul>
+<li>See <a href="https://certbot.eff.org/">Certbot</a> for more information on how to use Certbot to obtain a certificate.</li>
+<li>See <a href="https://certbot.eff.org/docs/using.html#webroot">Certbot webroot method</a> for more informatsion on how to use the webroot method.</li>
+<li>Install Certbot on your system.</li>
+<li>Run the following command to obtain a certificate:<br>
+<code>certbot certonly --webroot -w /path/to/tiny-https-server/public -d www.yourdomain.com -d yourdomain.com</code> <br>
+Replace <code>/path/to/tiny-https-server/public</code> with the path to your 'tiny-https-server' public directory and <code>yourdomain.com</code> with your domain name.</li>
+<li>Certbot saving the certificate to <code>/etc/letsencrypt/live/</code> and renewing it on a regular schedule.</li>
+<li>In the 'tiny-https-server' configuration file <code>config-sets.json</code>, set the <code>pathToCert</code> and <code>pathToPrivkey</code> options to the path of the certificate and key files:
+<pre><code class="language-json">{
+    &quot;production&quot;: {
+           &quot;tiny-https-server&quot;: {
+               &quot;pathToCert&quot;: &quot;/etc/letsencrypt/live/yourdomain.com/fullchain.pem&quot;,
+               &quot;pathToPrivkey&quot;: &quot;/etc/letsencrypt/live/yourdomain.com/privkey.pem&quot;
+           }
+       }
+}
+</code></pre>
+Replace <code>yourdomain.com</code> with your domain name.</li>
+<li>Run the 'tiny-https-server'.</li>
+</ul>
 <h2 id="license">License</h2>
 <p>This project is licensed under the MIT License.</p>
 <p>Copyright © 2021 Manuel Lõhmus</p>

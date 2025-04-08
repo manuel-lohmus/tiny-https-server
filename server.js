@@ -1,4 +1,4 @@
-﻿
+
 /**  Copyright (c) 2024, Manuel Lõhmus (MIT License). */
 
 'use strict';
@@ -110,11 +110,13 @@ function createHttpServer(options = {}, isHttpToHttps = false) {
             server.listen({ port: 80, host: options.host }, function (err) {
 
                 if (err) { return pError(err); }
-                pDebug(`Server running at http://${host}/`);
+                pDebug(`Server running at http://${host}/ redirect to https`);
             });
         }
 
         else {
+
+            requestArr.unshift(_well_known_acme_challenge);
 
             server.listen(options, function (err) {
 
@@ -342,7 +344,16 @@ function _routerRequest(req, res, next) {
     var { host } = _get_host_settings(req.headers.host, this.options);
     var _url = match(routerRequestObj[host], req.url);
 
-    if (_url) { return routerRequestObj[host][_url].call(this, req, res, next); }
+    if (_url) {
+
+        if (_url.endsWith('/*')) {
+
+            req.url = req.url.replace(_url.substring(0, _url.length - 2), '');
+            if (req.url[0] !== '/') { req.url = '/' + req.url; } // add leading slash
+        }
+
+        return routerRequestObj[host][_url].call(this, req, res, next);
+    }
 
     _url = match(routerRequestObj['*'], req.url);
 
@@ -355,9 +366,12 @@ function _routerRequest(req, res, next) {
         if (!o) { return; }
 
         return Object.keys(o)
+            .sort(function (a, b) { return b.length - a.length; }) // sort by length
             .find(function (k) {
-                return u.startsWith(k);
-            });
+                return u.startsWith(
+                    k.replace(/\/\*$/, '') // remove /* from the end
+                );
+            }); // find the longest match
     }
 }
 /**
@@ -377,7 +391,7 @@ function _requestRedirectToHttps(req, res, next) {
     // for .well-known/acme-challenge/
     if (req.url.startsWith("/.well-known/acme-challenge") && _isValidatedPath.call(server, '*', req.url.substring(2))) {
 
-        _static_request.call(server, req, res);
+        _well_known_acme_challenge.call(server, req, res);
 
         return;
     }
@@ -426,6 +440,31 @@ function _requestRedirectToHttps(req, res, next) {
     `);
 
     return;
+}
+function _well_known_acme_challenge(req, res, next) {
+
+    var server = this;
+
+    // for .well-known/acme-challenge/
+    if (req.url.startsWith("/.well-known/acme-challenge") && _isValidatedPath.call(server, '*', req.url.substring(2))) {
+
+        var { host, document_root, service_worker_version, precache_urls } = _get_host_settings(req.headers.host, server.options);
+        var filename = path.join(process.cwd(), document_root, req.url);
+
+        if (fs.existsSync(filename)) {
+
+            res.writeHead(200);
+            res.end(fs.readFileSync(filename));
+
+            return;
+        }
+
+        _not_found_content.call(server, req, res);
+
+        return;
+    }
+
+    next?.();
 }
 function _well_known_traffic_advice(req, res) {
 
@@ -891,10 +930,14 @@ self.addEventListener('install', (event) => {
 
     function response(code, settings) {
 
-        res.writeHead(200, {
-            "Content-Type": "text/javascript; charset=UTF-8",
-            "ETag": '"' + code.length + "-" + settings.service_worker_version + '"'
-        });
+        if (settings) {
+
+            res.writeHead(200, {
+                "Content-Type": "text/javascript; charset=UTF-8",
+                "ETag": '"' + code.length + "-" + settings.service_worker_version + '"'
+            });
+        }
+
         res.end(code);
     }
 }
@@ -1014,12 +1057,15 @@ function _get_host_settings(host, options, cached = true) {
         else if (options.subdomains[objHost.subdomains[objHost.subdomains.length - 1]]) {
             host = objHost.subdomains[objHost.subdomains.length - 1];
         }
+        else if (objHost.subdomains.length) {
+            host = objHost.subdomains.join(".");
+        }
         else if (hostnames.includes(objHost.domain)) {
             host = "";
         }
         // Not found domain
         else {
-            host = 1;
+            host = "";
         }
     }
 
@@ -1109,19 +1155,19 @@ function _static_file(filename, res, fn_not_found, subdomain) {
                 res.writeHead(statusCode, headers);
                 res.end();
             }
-            else if (/\bgzip\b/.test(acceptEncoding)) {
+            else if (stats.size > 128 && /\bgzip\b/.test(acceptEncoding)) {
 
                 headers["Content-Encoding"] = "gzip";
                 res.writeHead(statusCode, headers);
                 pipeline(raw, zlib.createGzip(), res, onError);
             }
-            else if (/\bdeflate\b/.test(acceptEncoding)) {
+            else if (stats.size > 128 && /\bdeflate\b/.test(acceptEncoding)) {
 
                 headers["Content-Encoding"] = "deflate";
                 res.writeHead(statusCode, headers);
                 pipeline(raw, zlib.createDeflate(), res, onError);
             }
-            else if (/\bbr\b/.test(acceptEncoding)) {
+            else if (stats.size > 128 && /\bbr\b/.test(acceptEncoding)) {
 
                 headers["Content-Encoding"] = "br";
                 res.writeHead(statusCode, headers);
@@ -1505,7 +1551,7 @@ self.addEventListener('fetch', function (event) {
             if (precacheResponse) return precacheResponse;
             var runtimeCache = await caches.open(RUNTIME);
             var runtimeCacheResponse = await runtimeCache.match(url);
-            if (navigator.onLine && (url.search || /[:]/.test(url.pathname))) {
+            if (navigator.onLine && (event.request.url.includes('?') || /[:]/.test(url.pathname))) {
                 return fetch(new Request(url + '', { cache: 'no-cache' }));
             }
             if (runtimeCacheResponse && runtimeCacheResponse.status === 200 && !runtimeCacheResponse.redirected) {
