@@ -65,22 +65,18 @@ function WebCluster(
 
         cluster.on('fork', (worker) => {
 
-            pDebug(`workerType '${worker.workerType}' started.`);
+            pDebug(`Web-Workers.type '${worker.workerType}' started.`);
 
-            var length = Object.keys(cluster.workers).length;
-
-            pDebug("workers.count", length);
+            pDebug("Web-Workers.count", Object.keys(cluster.workers).length);
         });
 
         cluster.on('exit', (worker, code, signal) => {
 
-            pDebug(`workerType '${worker.workerType}' died (`, signal || code, `).`);
+            pDebug(`Web-Workers.type '${worker.workerType}' died (`, signal || code, `).`);
 
-            var length = Object.keys(cluster.workers).length;
+            pDebug("Web-Workers.count", Object.keys(cluster.workers).length);
 
-            pDebug("workers.count", length);
-
-            if (!length) { initWorkers(); }
+            if (!Object.keys(cluster.workers).length) { initWorkers(); }
         });
 
         return webCluster;
