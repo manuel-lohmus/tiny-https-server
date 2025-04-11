@@ -1,4 +1,4 @@
-﻿/**  Copyright (c) 2024, Manuel Lõhmus (MIT License). */
+/**  Copyright (c) 2024, Manuel Lõhmus (MIT License). */
 
 if ('serviceWorker' in navigator) {
 
@@ -10,7 +10,7 @@ if ('serviceWorker' in navigator) {
 
     }, 300000); // 5min.
 
-    navigator.serviceWorker.register('/service_worker.js').then((registration) => {
+    navigator.serviceWorker.register('/service_worker.js', { scope: '/' }).then((registration) => {
 
         if (registration?.installing?.state === "installing") {
             

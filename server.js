@@ -70,7 +70,7 @@ var blacklist_blocking_from = 100,
         bad_path_validation_regex_patterns: ['.php$|.asmx$'],
         contact_email: 'default@' + hostnames[0] //'default@localhost'
     }),
-    blacklist = _watchJsonFile(_resolvePath(serverOptions.pathToBlacklistFile));
+    blacklist = dataContext.watchJsonFile({ filePath: serverOptions.pathToBlacklistFile });
 
 module.exports = { createHttpServer, createHttpsServer, availableLinks: _availableLinks };
 
@@ -186,7 +186,7 @@ function createHttpsServer(options = {}) {
                 key: fs.readFileSync(options.pathToPrivkey),
                 cert: fs.readFileSync(options.pathToCert)
             });
-        }, 1000);
+        }, 10000);
     });
 
     return server;
@@ -386,22 +386,36 @@ function _requestRedirectToHttps(req, res, next) {
 
     if (server instanceof https.Server) { return next(); }
 
+    // for log file
     res.on('close', function () { _log.call(server, req, res); });
 
     // for .well-known/acme-challenge/
     if (req.url.startsWith("/.well-known/acme-challenge") && _isValidatedPath.call(server, '*', req.url.substring(2))) {
 
-        _well_known_acme_challenge.call(server, req, res);
-
-        return;
+        return _well_known_acme_challenge.call(server, req, res);
     }
 
-    if (req.url.startsWith("/service_worker")) {
+    // for service worker version
+    if (req.url.startsWith("/service_worker_version")) { return _service_worker_version_request.call(server, req, res); }
 
-        _service_worker_request.call(server, req, res);
+    // for service worker
+    if (req.url.startsWith("/service_worker")) { return _service_worker_request.call(server, req, res); }
 
-        return;
-    }
+    // for blacklist info
+    if (req.url.startsWith("/.well-known/blacklist")) { return _blacklist_info.call(server, req, res); }
+
+    // for traffic advice 
+    if (req.url.startsWith("/.well-known/traffic-advice")) { return _well_known_traffic_advice.call(server, req, res); }
+
+    // for security.txt
+    if (req.url.startsWith("/.well-known/security.txt")) { return _well_known_security_txt.call(server, req, res); }
+
+    // for robots.txt
+    if (req.url.startsWith("/robots.txt")) { return _static_request.call(server, req, res); }
+
+    // for sitemap.xml
+    if (req.url.startsWith("/sitemap.xml")) { return _static_request.call(server, req, res); }
+
 
     var ip = req.client.remoteAddress;
 
@@ -588,7 +602,7 @@ function _emit(eventName, req, res) {
                 req.destroy();
             });
 
-            var host_settings = _get_host_settings(req.headers.host, server.options);
+            var host_settings = _get_host_settings(req.headers.host || '', server.options);
 
             if (server.options.port === 80 && req.url.startsWith("/.well-known/acme-challenge")
                 && _isValidatedPath.call(server, host_settings.host, req.url.substring(2))) {
@@ -890,15 +904,16 @@ function _service_worker_request(req, res) {
 
     if (req.method.toLocaleUpperCase() === "GET") {
 
-        var isSSL = (this.options.port === 80)
+        var isServerSSL = (this.options.port === 80)
             ? false
             : Boolean(
                 this.options.key && this.options.cert
                 || this.options.port === 443
             );
         var isClientSSL = Boolean(req.client.ssl);
+        var redirectToHttps = isServerSSL && !isClientSSL;
 
-        if (isSSL && !isClientSSL) {
+        if (redirectToHttps) {
 
             return response(`
 self.addEventListener('install', (event) => {
@@ -930,14 +945,13 @@ self.addEventListener('install', (event) => {
 
     function response(code, settings) {
 
-        if (settings) {
-
-            res.writeHead(200, {
-                "Content-Type": "text/javascript; charset=UTF-8",
-                "ETag": '"' + code.length + "-" + settings.service_worker_version + '"'
-            });
+        var headers = {
+            "Content-Type": "text/javascript; charset=UTF-8"
         }
 
+        if (settings) { headers["ETag"] = '"' + code.length + "-" + settings.service_worker_version + '"'; }
+
+        res.writeHead(200, headers);
         res.end(code);
     }
 }
@@ -1024,6 +1038,9 @@ function _static_request(req, res) {
  */
 function _get_host_settings(host, options, cached = true) {
 
+    host = host?.trim() || "";
+    host = host.replace(/:\d+$/, ""); // remove port number
+
     if (cached && _get_host_settings.host_settings?.[host]) { return _get_host_settings.host_settings[host]; }
 
     var _host = host,
@@ -1032,7 +1049,7 @@ function _get_host_settings(host, options, cached = true) {
         is_new_service_worker_reload_browser = false,
         precache_urls = null;
 
-    if (host.toLocaleLowerCase().startsWith("www.")) { host = host.substring(4); }
+    if (host?.toLocaleLowerCase().startsWith("www.")) { host = host.substring(4); }
 
     // Excellent Default Domain
     if (host === options.host) {
@@ -1459,59 +1476,6 @@ function _resolvePath(pathToFile) {
 
     return pathToFile;
 }
-function _watchJsonFile(filePath, data = {}) {
-
-    var isFileWriteInProgress = false,
-        timeout;
-
-    if (!data) { data = dataContext({}); }
-    if (!data._isDataContext) { data = dataContext(data); }
-
-    fs.watchFile(filePath, (curr, prev) => {
-
-        if (!isFileWriteInProgress && fs.existsSync(filePath)) {
-
-            data.overwritingData(fs.readFileSync(
-                filePath,
-                { encoding: 'utf8' }
-            ));
-        }
-    });
-
-    data.on('-change', (event) => {
-
-        clearTimeout(timeout);
-
-        timeout = setTimeout(() => {
-
-            if (!data.isChanged || isFileWriteInProgress || !configSets.enableFileReadWrite) { return; }
-
-            isFileWriteInProgress = true;
-
-            if (!fs.existsSync(path.dirname(filePath))) {
-
-                fs.mkdirSync(path.dirname(filePath), { recursive: true });
-            }
-
-            fs.writeFile(
-                filePath,
-                dataContext.stringify(data, null, 2),
-                { encoding: 'utf8' },
-                (err) => {
-
-                    if (err) throw err;
-
-                    data.resetChanges();
-                    isFileWriteInProgress = false;
-                }
-            );
-        });
-        // I am alive.
-        return true;
-    });
-
-    return data;
-}
 //*** Service Worker ***
 function _getServiceWorkerCode(settings) {
     return `
@@ -1552,7 +1516,14 @@ self.addEventListener('fetch', function (event) {
             var runtimeCache = await caches.open(RUNTIME);
             var runtimeCacheResponse = await runtimeCache.match(url);
             if (navigator.onLine && (event.request.url.includes('?') || /[:]/.test(url.pathname))) {
-                return fetch(new Request(url + '', { cache: 'no-cache' }));
+                return fetch(new Request(url + '', { cache: 'no-cache' })).then(response => {
+                    if (response.status === 200 && response.redirected) {
+                        return fetch(new Request(response.redirected + '', { cache: 'no-cache' })).then(response => {
+                            return response;
+                        });
+                    }
+                    return response;
+                });
             }
             if (runtimeCacheResponse && runtimeCacheResponse.status === 200 && !runtimeCacheResponse.redirected) {
                 return runtimeCacheResponse;
@@ -1618,6 +1589,7 @@ function _getFiles(fsPath) {
     }, []);
 
 }
+
 // Debugging
 function pDebug(msg) { if (serverOptions.isDebug) { console.log(`[ DEBUG ] 'tiny-https-server' `, ...arguments); } }
 function pError(msg) { if (serverOptions.isDebug) { console.error(`[ ERROR ] 'tiny-https-server' `, ...arguments); } }

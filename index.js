@@ -65,14 +65,14 @@ function WebCluster(
 
         cluster.on('fork', (worker) => {
 
-            pDebug(`Web-Workers.type '${worker.workerType}' started.`);
+            pDebug(`Web-Worker.type '${worker.workerType}' started.`);
 
             pDebug("Web-Workers.count", Object.keys(cluster.workers).length);
         });
 
         cluster.on('exit', (worker, code, signal) => {
 
-            pDebug(`Web-Workers.type '${worker.workerType}' died (`, signal || code, `).`);
+            pDebug(`Web-Worker.type '${worker.workerType}' died (`, signal || code, `).`);
 
             pDebug("Web-Workers.count", Object.keys(cluster.workers).length);
 
