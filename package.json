@@ -1,6 +1,6 @@
 {
   "name": "tiny-https-server",
-  "version": "2.0.0-beta.17",
+  "version": "2.0.0-beta.18",
   "license": "MIT",
   "description": "Tiny web server with HTTPS support, static file serving, subdomain support, middleware support, and service worker support.",
   "keywords": [
@@ -28,8 +28,7 @@
   "browser": "browser.js",
   "main": "index.js",
   "scripts": {
-    "test": "node index.test",
-    "start": "node index.js"
+    "test": "node index.test"
   },
   "bin": {
     "tiny-https-server": "bin/tiny-https-server.js"

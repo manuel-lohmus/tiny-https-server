@@ -797,58 +797,52 @@ function _log(req, res) {
 
     if (!this.logFileName) { _setLogfileName.call(this); }
 
-    var ip = req.client.remoteAddress;
-    var port = req.client.remotePort;
-    var msg = blacklist[ip] ? blacklist[ip].status + " " : "         ";
+    var ip = req.client.remoteAddress || 'unknown';
+    var port = req.client.remotePort || 'unknown';
+    var msg = blacklist[ip] ? blacklist[ip].status : "";
+    while (msg.length < 9) { msg += ' '; }
     // client address and port
-    msg += ip + ":" + port + "\t";
-    msg += "[" + Date.now() + "] ";
+    msg += ip + ":" + port + " "; //255.255.255.255:65535
+    while (msg.length < 31) { msg += ' '; }
+    msg += "[" + new Date().toISOString() + "] ";
+    // host
+    msg += (req.headers.host || 'unknown') + " ";
+    while (msg.length < 80) { msg += ' '; }
     // status code or connection refused
     msg += res.writableFinished ? res.statusCode + " " : "--- ";
-    // host:port method url httpVersion
-    msg += req.headers.host + (req.socket.localPort ? ":" + req.socket.localPort : "") + "\t" + req.method + " " + req.url + " HTTP/" + req.httpVersion + "\t\t";
+    msg += req.method + " ";
+    while (msg.length < 92) { msg += ' '; }
+    msg += req.url + " ";
+    while (msg.length < 150) { msg += ' '; }
     // user agent
-    msg += '"' + req.headers["user-agent"] + '"\r\n';
+    msg += '"' + (req.headers["user-agent"] || 'unknown') + '"\r\n';
 
     fs.appendFile(
         this.logFileName,
         msg,
         { flag: 'a+' },
         function (err) {
-
             if (err) { pError(err); }
         }
     );
 
     function _setLogfileName() {
-
         var self = this,
             date = new Date(),
-            year = date.getUTCFullYear(),
-            month = date.getUTCMonth() + 1 < 10 ? `0${date.getUTCMonth() + 1}` : date.getUTCMonth() + 1,
-            day = date.getUTCDate() < 10 ? `0${date.getUTCDate()}` : date.getUTCDate();
+            night = Date.UTC(
+                date.getUTCFullYear(),
+                date.getUTCMonth(),
+                date.getUTCDate(),
+                0, 0, 0, 0
+            ) + (24 * 60 * 60 * 1000);
 
-        self.logFileName = path.join(process.cwd(), self.options.logDir, year + "-" + month + "-" + day + ".log");
+        self.logFileName = path.join(process.cwd(), self.options.logDir, date.toISOString().split('T').shift() + '.log');
 
         if (!fs.existsSync(path.dirname(self.logFileName))) {
-
             fs.mkdirSync(path.dirname(self.logFileName), { recursive: true });
         }
 
-
-        var night = new Date(
-            date.getUTCFullYear(),
-            date.getUTCMonth(),
-            date.getUTCDate() + 1, // the next day, ...
-            0, 0, 0 // ...at 00:00:00 hours
-        );
-
-        setTimeout(function () {
-
-            _setLogfileName.call(self);
-        },
-            night.getTime() - date.getTime()
-        );
+        setTimeout(function () { self.logFileName = ''; }, night - Date.now());
     }
 }
 function _setDefHeader(req, res) {
@@ -1238,7 +1232,7 @@ function _not_found_content(req, res, set_timeout) {
         res.writeHead(404);
     }
 
-    if (set_timeout) {
+    if (0 < set_timeout) {
         setTimeout(function () { res.end(); }, set_timeout);
     }
     else { res.end(); }

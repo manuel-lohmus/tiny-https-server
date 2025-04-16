@@ -1,25 +1,24 @@
+
 <div class="row w-100">
-<div class="col-3 d-none d-lg-inline">
-<div class="sticky-top overflow-auto vh-100">
-<div id="list-headers" class="list-group mt-5">
+<div class="col-lg-3 d-lg-inline">
+<div class="sticky-top overflow-auto vh-lg-100">
+<div id="list-headers" class="list-group mt-2 ms-lg-2 ms-4">
 
-- [Tiny HTTPS Server](#tiny-https-server)
-     - [Description](#description)
-     - [Features](#features)
-     - [Installation](#installation)
-     - [Testing](#testing)
-     - [How to use](#how-to-use)
-     - [Let's Encrypt support](#lets-encrypt-support)
-     - [License](#license)
- 
- 
-</div>
-</div>
-</div>
- 
-<div class="col">
-<div class="p-2 markdown-body" data-bs-spy="scroll" data-bs-target="#list-headers" data-bs-offset="0" tabindex="0">
+#### Table of contents
+- [**Description**](#description)
+- [**Features**](#features)
+- [**Installation**](#installation)
+- [**Testing**](#testing)
+- [**How to use**](#how-to-use)
+- [**Let's Encrypt support**](#lets-encrypt-support)
+- [**License**](#license)
 
+</div>
+</div>
+</div>
+ 
+<div class="col-lg-9 mt-2">
+<div class="ps-4 markdown-body" data-bs-spy="scroll" data-bs-target="#list-headers" data-bs-offset="0" tabindex="0">
 
 # Tiny HTTPS Server
 This manual is also available in [HTML5](https://manuel-lohmus.github.io/tiny-https-server/README.html).<br>
@@ -195,6 +194,7 @@ Copyright &copy; 2021 Manuel Lõhmus
 [![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/donate?hosted_button_id=H2ZHLF8U2HGVA)
 
 Donations are welcome and will go towards further development of this project.
+
 
 <br>
 <br>
