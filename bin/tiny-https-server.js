@@ -17,7 +17,7 @@ var options = {
     parallelism: parallelism || 'auto',
     host: host || "0.0.0.0",
     port: parseInt(port) || process.env.PORT || 80,
-    logdir: logdir || undefined,
+    logDir: typeof logdir === 'string' ? logdir : './log/tiny-https-server',
     primary_domain: {
         document_root: docroot || './',
         precache_urls: null

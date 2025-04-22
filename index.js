@@ -49,7 +49,8 @@ function WebCluster(
         }),
         web_workers = [];
 
-    if (options.isDebug) { clusterOptions.isDebug = options.isDebug; serverOptions.isDebug = options.isDebug; }
+    clusterOptions.isDebug = options.isDebug;
+    serverOptions.isDebug = options.isDebug;
     delete options.isDebug;
     if (options.parallelism) { clusterOptions.parallelism = options.parallelism; }
     delete options.parallelism;

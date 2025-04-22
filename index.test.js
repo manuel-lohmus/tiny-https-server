@@ -23,6 +23,7 @@ var cluster = WebCluster({
             service_worker_version: "0"
         }
     },
+    logDir: '',
     contact_email: 'admin@localhost.local'
 },
 

@@ -3,8 +3,8 @@
 
 'use strict';
 
-var blacklist_blocking_from = 100,
-    maxConnectionsForAutoScaling = 3,
+var blacklistBlockingLimit = 100,
+    maxAutoScalingConnections = 3,
 
     fs = require("node:fs"),
     path = require("node:path"),
@@ -84,7 +84,14 @@ return;
  */
 function createHttpServer(options = {}, isHttpToHttps = false) {
 
-    options = configSets.assign(serverOptions, options, true);
+    if (configSets.isSaveChanges) {
+
+        options = configSets.assign(serverOptions, options, true);
+    }
+    else {
+
+        options = Object.assign(options, serverOptions);
+    }
 
     var server = http.createServer(options);
     server.options = options;
@@ -174,20 +181,23 @@ function createHttpsServer(options = {}) {
         server.listen(options, listenCallback);
     });
 
-    var certUpdateWaitTimeout;
-    fs.watch(path.dirname(options.pathToCert), function (eventType, filename) {
+    if (fs.existsSync(options.pathToPrivkey) && fs.existsSync(options.pathToCert)) {
 
-        if (!fs.existsSync(options.pathToPrivkey) || !fs.existsSync(options.pathToCert)) { return; }
+        var certUpdateWaitTimeout;
+        fs.watch(path.dirname(options.pathToCert), function (eventType, filename) {
 
-        clearTimeout(certUpdateWaitTimeout);
-        certUpdateWaitTimeout = setTimeout(function () {
+            if (!fs.existsSync(options.pathToPrivkey) || !fs.existsSync(options.pathToCert)) { return; }
 
-            server.setSecureContext({
-                key: fs.readFileSync(options.pathToPrivkey),
-                cert: fs.readFileSync(options.pathToCert)
-            });
-        }, 10000);
-    });
+            clearTimeout(certUpdateWaitTimeout);
+            certUpdateWaitTimeout = setTimeout(function () {
+
+                server.setSecureContext({
+                    key: fs.readFileSync(options.pathToPrivkey),
+                    cert: fs.readFileSync(options.pathToCert)
+                });
+            }, 10000);
+        });
+    }
 
     return server;
 
@@ -209,7 +219,7 @@ function createHttpsServer(options = {}) {
  */
 function trackNodeModules() {
 
-    if (configSets.enableFileReadWrite) {
+    if (configSets.enableFileReadWrite && fs.existsSync('./node_modules')) {
 
         var updateTimeout;
         fs.watch('./node_modules', function (eventType, filename) {
@@ -251,7 +261,7 @@ function trackNodeModules() {
  */
 function trackDirectoryServiceWorkerVersion(domainOptions) {
 
-    if (configSets.enableFileReadWrite && domainOptions) {
+    if (configSets.enableFileReadWrite && domainOptions && fs.existsSync(_resolvePath(domainOptions.document_root))) {
 
         var updateTimeout;
         fs.watch(_resolvePath(domainOptions.document_root), updatedServiceWorkerVersion);
@@ -420,7 +430,7 @@ function _requestRedirectToHttps(req, res, next) {
     var ip = req.client.remoteAddress;
 
     // blocking
-    if (blacklist[ip] && blacklist[ip].queries >= blacklist_blocking_from) {
+    if (blacklist[ip] && blacklist[ip].queries >= blacklistBlockingLimit) {
 
         blacklist[ip].status = "blocking";
         blacklist[ip].queries++;
@@ -588,7 +598,7 @@ function _emit(eventName, req, res) {
 
     if (eventName === "request") {
 
-        setImmediate(function () {
+        process.nextTick(function () {
 
             res.on('close', function () {
 
@@ -613,9 +623,7 @@ function _emit(eventName, req, res) {
                 return;
             }
 
-            var ip = req.client.remoteAddress;
-
-            if (blacklist_check(ip, host_settings)) { return; }
+            if (blacklist_check(req.client.remoteAddress, host_settings)) { return; }
 
             req.iterator = requestArr.entries();
 
@@ -664,7 +672,7 @@ function _emit(eventName, req, res) {
 
         // blocking
         if (blacklist[ip]
-            && blacklist[ip].queries > blacklist_blocking_from) {
+            && blacklist[ip].queries > blacklistBlockingLimit) {
 
             blacklist[ip].queries++;
             blacklist[ip].last_request = last_request(req, res);
@@ -752,7 +760,7 @@ function _autoScaling() {
 
                 clearTimeout(scalingDown.timeout);
 
-                if (count > maxConnectionsForAutoScaling && !server.emittedAutoScaling) {
+                if (count > maxAutoScalingConnections && !server.emittedAutoScaling) {
 
                     server.emittedAutoScaling = true;
                     server._emit("autoscaling", count);
@@ -793,9 +801,9 @@ function _autoScaling() {
 }
 function _log(req, res) {
 
-    if (!configSets.enableFileReadWrite || !this.options.logDir) { return; }
+    if (!this.options.logDir) { return; }
 
-    if (!this.logFileName) { _setLogfileName.call(this); }
+    if (!_log.logFileName) { _setupLogFile.call(this); }
 
     var ip = req.client.remoteAddress || 'unknown';
     var port = req.client.remotePort || 'unknown';
@@ -816,19 +824,12 @@ function _log(req, res) {
     while (msg.length < 150) { msg += ' '; }
     // user agent
     msg += '"' + (req.headers["user-agent"] || 'unknown') + '"\r\n';
+    _log.content += msg;
 
-    fs.appendFile(
-        this.logFileName,
-        msg,
-        { flag: 'a+' },
-        function (err) {
-            if (err) { pError(err); }
-        }
-    );
 
-    function _setLogfileName() {
-        var self = this,
-            date = new Date(),
+    function _setupLogFile() {
+
+        var date = new Date(),
             night = Date.UTC(
                 date.getUTCFullYear(),
                 date.getUTCMonth(),
@@ -836,13 +837,34 @@ function _log(req, res) {
                 0, 0, 0, 0
             ) + (24 * 60 * 60 * 1000);
 
-        self.logFileName = path.join(process.cwd(), self.options.logDir, date.toISOString().split('T').shift() + '.log');
+        _log.logFileName = path.join(process.cwd(), this.options.logDir, date.toISOString().split('T').shift() + '.log');
 
-        if (!fs.existsSync(path.dirname(self.logFileName))) {
-            fs.mkdirSync(path.dirname(self.logFileName), { recursive: true });
+        if (!fs.existsSync(path.dirname(_log.logFileName))) {
+            fs.mkdirSync(path.dirname(_log.logFileName), { recursive: true });
         }
 
-        setTimeout(function () { self.logFileName = ''; }, night - Date.now());
+        setTimeout(function () { _log.logFileName = ''; }, night - Date.now());
+
+        _log.inrerval = setInterval(function () {
+
+            if (!_log.logFileName) {
+
+                clearInterval(_log.inrerval);
+                return;
+            }
+            if (_log.logFileName && _log.content.length) {
+
+                fs.appendFile(
+                    _log.logFileName,
+                    _log.content,
+                    { flag: 'a+' },
+                    function (err) {
+                        if (err) { pError(err); }
+                    }
+                );
+                _log.content = '';
+            }
+        }, 10000);
     }
 }
 function _setDefHeader(req, res) {
@@ -1341,7 +1363,7 @@ function _isValidatedPath(host, strPath) {
     if (this.validatePaths?.[host]?.[strPath] || this.validatePaths?.['*']?.[strPath]) { return true; }
 
     var decodePath;
-    try { decodePath = decodeURI(strPath); } catch (err) { return false; }
+    try { decodePath = decodeURI((strPath + '').split('?').shift()); } catch (err) { return false; }
     if (decodePath.indexOf('\0') !== -1) { return false; }
     if (decodePath.indexOf('..') !== -1) { return false; }
 
@@ -1402,52 +1424,49 @@ function _blacklist_request(req, res) {
     });
     res.timeout = setTimeout(function () { wait(); }, 3000);
 }
-function _sortBlacklist(blacklist, blockedOnly) {
+function _sortBlacklist(blacklist, search) {
 
     var entries = Array.from(Object.entries(blacklist));
 
-    if (blockedOnly) { entries = entries.filter(function (v) { return v[1].status === "blocking"; }); }
+    if (search) {
+
+        search = search.toString().toLowerCase();
+        search = search.replace(/[^a-z0-9\.\-]/g, ''); // remove special characters
+
+        entries = entries.filter(function (v) {
+
+            if ((v[0] + '').toLowerCase().includes(search)) { return true; }
+
+            if (!v[1]) { return false; }
+
+            return Object.keys(v[1]).some(function (key) {
+
+                return v[1][key].toString().toLowerCase().includes(search);
+            });
+        });
+    }
 
     entries.sort(function (a, b) {
 
-        if (a[1].last_date === undefined && b[1].last_date) {
-            if (a[1].start_date < b[1].last_date) {
-                return 1;
-            } else {
-                return -1;
-            }
-        } else if (a[1].last_date && b[1].last_date === undefined) {
-            if (a[1].last_date < b[1].start_date) {
-                return 1;
-            } else {
-                return -1;
-            }
-        } else if (a[1].last_date < b[1].last_date) {
-            return 1;
-        } else if (a[1].last_date > b[1].last_date) {
-            return -1;
-        } else if (a[1].start_date === undefined && b[1].start_date) {
-            return 1;
-        } else if (a[1].start_date && b[1].start_date === undefined) {
-            return -1;
-        } else if (a[1].start_date < b[1].start_date) {
-            return 1;
-        } else if (a[1].start_date > b[1].start_date) {
-            return -1;
-        } else {
-            return 0;
-        }
+        a = a[1]?.start_date ? a[1].start_date + "" : "";
+        b = b[1]?.start_date ? b[1].start_date + "" : "";
+
+        return a.localeCompare(b);
     });
+
+    entries.reverse();
 
     return Object.fromEntries(entries);
 }
 function _blacklist_info(req, res) {
 
+    var search = req.url.split("?")[1] || "";
+
     res.writeHead(200, {
         "Content-Type": "text/json",
         "Cache-Control": "no-cache"
     });
-    res.write(JSON.stringify(_sortBlacklist(blacklist), null, 2));
+    res.write(JSON.stringify(_sortBlacklist(blacklist, search), null, 2));
     res.end();
 }
 function _getHostnames() {
