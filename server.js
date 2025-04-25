@@ -1,5 +1,4 @@
-
-/**  Copyright (c) 2024, Manuel Lõhmus (MIT License). */
+/**  Copyright (c) Manuel Lõhmus (MIT License). */
 
 'use strict';
 
@@ -153,7 +152,14 @@ function createHttpServer(options = {}, isHttpToHttps = false) {
  */
 function createHttpsServer(options = {}) {
 
-    options = configSets.assign(serverOptions, options, true);
+    if (configSets.isSaveChanges) {
+
+        options = configSets.assign(serverOptions, options, true);
+    }
+    else {
+
+        options = Object.assign(options, serverOptions);
+    }
 
     if (!options.port || options.port === 80) { options.port = 443; }
     if (!options.pathToPrivkey) { options.pathToPrivkey = path.join(__dirname, "./cert/localhost-key.pem"); }

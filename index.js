@@ -1,5 +1,4 @@
-
-/**  Copyright (c) 2024, Manuel Lõhmus (MIT License). */
+/**  Copyright (c) Manuel Lõhmus (MIT License). */
 
 'use strict';
 
@@ -49,8 +48,12 @@ function WebCluster(
         }),
         web_workers = [];
 
-    clusterOptions.isDebug = options.isDebug;
-    serverOptions.isDebug = options.isDebug;
+    if (typeof options.isDebug === 'boolean') {
+
+        clusterOptions.isDebug = options.isDebug;
+        serverOptions.isDebug = options.isDebug;
+    }
+
     delete options.isDebug;
     if (options.parallelism) { clusterOptions.parallelism = options.parallelism; }
     delete options.parallelism;

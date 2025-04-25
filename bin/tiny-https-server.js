@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/**  Copyright (c) Manuel Lõhmus (MIT License). */
 
 'use strict';
 
