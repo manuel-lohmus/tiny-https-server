@@ -67,7 +67,9 @@ var blacklistBlockingLimit = 100,
         },
         pathToBlacklistFile: './log/tiny-https-server/blacklist.json',
         bad_path_validation_regex_patterns: ['.php$|.asmx$'],
-        contact_email: 'default@' + hostnames[0] //'default@localhost'
+        contact_email: 'default@' + hostnames[0], //'default@localhost'
+        maxConnections: 100,
+        maxRequestsPerSocket: 100
     }),
     blacklist = dataContext.watchJsonFile({ filePath: serverOptions.pathToBlacklistFile });
 
@@ -143,6 +145,9 @@ function createHttpServer(options = {}, isHttpToHttps = false) {
         trackDirectoryServiceWorkerVersion(serverOptions.subdomains[host]);
     });
 
+    if (serverOptions.maxConnections) { server.maxConnections = serverOptions.maxConnections; }
+    if (serverOptions.maxRequestsPerSocket) { server.maxRequestsPerSocket = serverOptions.maxRequestsPerSocket; }
+
     return server;
 }
 
@@ -204,6 +209,9 @@ function createHttpsServer(options = {}) {
             }, 10000);
         });
     }
+
+    if (serverOptions.maxConnections) { server.maxConnections = serverOptions.maxConnections; }
+    if (serverOptions.maxRequestsPerSocket) { server.maxRequestsPerSocket = serverOptions.maxRequestsPerSocket; }
 
     return server;
 
