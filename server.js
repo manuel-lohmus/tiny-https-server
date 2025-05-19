@@ -42,6 +42,7 @@ var blacklistBlockingLimit = 100,
             service_worker_version: '0',
             service_worker_version_update: true,
             is_new_service_worker_reload_browser: false,
+            service_worker_disabled: false,
             precache_urls: [],
             headers: { default: { server: "tiny-https-server" } },
             sitemap_update: true
@@ -769,7 +770,7 @@ function _autoScaling() {
         server.getConnections(function (err, count) {
 
             if (err) { pError(err); }
-            
+
             if (count) {
 
                 clearTimeout(scalingDown.timeout);
@@ -979,6 +980,26 @@ self.addEventListener('install', (event) => {
             "Content-Type": "text/javascript; charset=UTF-8"
         }
 
+        if (settings.service_worker_disabled) {
+
+            settings.service_worker_version = "0";
+            code = `
+self.addEventListener('install', (event) => {
+    event.waitUntil(
+        caches.keys().then(cachesToDelete => {
+            return Promise.all(cachesToDelete.map(cacheToDelete => {
+                    return caches.delete(cacheToDelete);
+                }));
+            })
+            .then(self.skipWaiting())
+        );
+});
+self.addEventListener('activate', event => {
+    self.clients.claim();
+});
+                `;
+        }
+
         if (settings) { headers["ETag"] = '"' + code.length + "-" + settings.service_worker_version + '"'; }
 
         res.writeHead(200, headers);
@@ -1077,6 +1098,7 @@ function _get_host_settings(host, options, cached = true) {
         document_root = "",
         service_worker_version = "0",
         is_new_service_worker_reload_browser = false,
+        service_worker_disabled = false,
         precache_urls = null;
 
     if (host?.toLocaleLowerCase().startsWith("www.")) { host = host.substring(4); }
@@ -1121,6 +1143,7 @@ function _get_host_settings(host, options, cached = true) {
         document_root = options.primary_domain.document_root;
         service_worker_version = options.primary_domain.service_worker_version;
         is_new_service_worker_reload_browser = options.primary_domain.is_new_service_worker_reload_browser;
+        service_worker_disabled = options.primary_domain.service_worker_disabled;
         precache_urls = options.primary_domain.precache_urls;
     }
 
@@ -1142,6 +1165,13 @@ function _get_host_settings(host, options, cached = true) {
         }
         is_new_service_worker_reload_browser = options.subdomains[host].is_new_service_worker_reload_browser;
 
+        if (options.subdomains[host].service_worker_disabled === undefined) {
+
+            options.subdomains[host].service_worker_disabled = service_worker_disabled;
+            //this.emit("options_changed", options);
+        }
+        service_worker_disabled = options.subdomains[host].service_worker_disabled;
+
         if (options.subdomains[host].precache_urls === undefined) {
 
             options.subdomains[host].precache_urls = precache_urls;
@@ -1157,6 +1187,7 @@ function _get_host_settings(host, options, cached = true) {
         document_root,
         service_worker_version,
         is_new_service_worker_reload_browser,
+        service_worker_disabled,
         precache_urls
     };
 

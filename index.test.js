@@ -85,7 +85,7 @@ function test() {
             httpRequest('http://localhost/service_worker', function (err, res) {
                 if (err) { done(err); return; }
                 check('status', res.status).mustBe(200);
-                check('data', res.data).mustInclude('var RUNTIME = \'runtime@');
+                check('data', res.data).mustInclude('self.addEventListener(\'install\'');
                 done();
             });
         });
