@@ -1,4 +1,14 @@
+<div class="row w-100">
+<div class="col-12 text-center">
 
+# Tiny HTTPS Server
+
+Tiny web server with HTTPS support, static file serving, subdomain support,<br> 
+middleware support, service worker support, and clastering support.<br>
+This manual is also available in [HTML5](https://manuel-lohmus.github.io/tiny-https-server/README.html).
+
+</div>
+</div> 
 <div class="row w-100">
 <div class="col-lg-3 d-lg-inline">
 <div class="sticky-top overflow-auto vh-lg-100">
@@ -20,15 +30,13 @@
 <div class="col-lg-9 mt-2">
 <div class="ps-4 markdown-body" data-bs-spy="scroll" data-bs-target="#list-headers" data-bs-offset="0" tabindex="0">
 
-# Tiny HTTPS Server
-This manual is also available in [HTML5](https://manuel-lohmus.github.io/tiny-https-server/README.html).<br>
-Tiny web server with HTTPS support, static file serving, 
-subdomain support, middleware support, service worker support, and clastering support.
-
 ## Description
 Tiny web server is disain for SPA (Single Page Application). 
 This project is a tiny web server that serves static files, supports HTTPS, 
 subdomains, middleware, and service workers. 
+This module is part of the ['conextra'](https://www.npmjs.com/package/conextra) framework,
+which is a simple and easy-to-use single-page application (SPA) framework.
+You have to try it! A different solution than MVC (model–view–controller).
 When you run the server, it will serve the files in the `public` directory. 
 You can add your own files to the `public` directory and access them through the server. 
 The server also supports subdomains, so you can access different files based on the subdomain. 

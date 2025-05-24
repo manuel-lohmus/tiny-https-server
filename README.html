@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
-    <title>Table of contents</title>
+    <title>Tiny HTTPS Server</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5/dist/css/bootstrap.min.css" />
     <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/bootstrap@5/dist/js/bootstrap.bundle.min.js"></script>
@@ -30,6 +30,14 @@
 </head>
 <body>
     <div class="row w-100">
+<div class="col-12 text-center">
+<h1 id="tiny-https-server">Tiny HTTPS Server</h1>
+<p>Tiny web server with HTTPS support, static file serving, subdomain support,<br>
+middleware support, service worker support, and clastering support.<br>
+This manual is also available in <a href="https://manuel-lohmus.github.io/tiny-https-server/README.html">HTML5</a>.</p>
+</div>
+</div> 
+<div class="row w-100">
 <div class="col-lg-3 d-lg-inline">
 <div class="sticky-top overflow-auto vh-lg-100">
 <div id="list-headers" class="list-group mt-2 ms-lg-2 ms-4">
@@ -49,14 +57,13 @@
  
 <div class="col-lg-9 mt-2">
 <div class="ps-4 markdown-body" data-bs-spy="scroll" data-bs-target="#list-headers" data-bs-offset="0" tabindex="0">
-<h1 id="tiny-https-server">Tiny HTTPS Server</h1>
-<p>This manual is also available in <a href="https://manuel-lohmus.github.io/tiny-https-server/README.html">HTML5</a>.<br>
-Tiny web server with HTTPS support, static file serving,
-subdomain support, middleware support, service worker support, and clastering support.</p>
 <h2 id="description">Description</h2>
 <p>Tiny web server is disain for SPA (Single Page Application).
 This project is a tiny web server that serves static files, supports HTTPS,
 subdomains, middleware, and service workers.
+This module is part of the <a href="https://www.npmjs.com/package/conextra">'conextra'</a> framework,
+which is a simple and easy-to-use single-page application (SPA) framework.
+You have to try it! A different solution than MVC (model–view–controller).
 When you run the server, it will serve the files in the <code>public</code> directory.
 You can add your own files to the <code>public</code> directory and access them through the server.
 The server also supports subdomains, so you can access different files based on the subdomain.
