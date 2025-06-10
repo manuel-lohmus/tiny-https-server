@@ -149,6 +149,14 @@ function createHttpServer(options = {}, isHttpToHttps = false) {
     if (serverOptions.maxConnections) { server.maxConnections = serverOptions.maxConnections; }
     if (serverOptions.maxRequestsPerSocket) { server.maxRequestsPerSocket = serverOptions.maxRequestsPerSocket; }
 
+    server.sendFile = function sendFile(filePath, req, res) {
+
+        _static_file.call(server, filePath, res, function () {
+
+            _not_found_content.call(server, req, res);
+        });
+    };
+
     return server;
 }
 
@@ -213,6 +221,14 @@ function createHttpsServer(options = {}) {
 
     if (serverOptions.maxConnections) { server.maxConnections = serverOptions.maxConnections; }
     if (serverOptions.maxRequestsPerSocket) { server.maxRequestsPerSocket = serverOptions.maxRequestsPerSocket; }
+
+    server.sendFile = function sendFile(filePath, req, res) {
+
+        _static_file.call(server, filePath, res, function () {
+
+            _not_found_content.call(server, req, res);
+        });
+    };
 
     return server;
 
@@ -1076,7 +1092,7 @@ function _static_request(req, res) {
         _static_file.call(server, filename, res, function () {
 
             _not_found_content.call(server, req, res);
-        }, host);
+        });
 
         return;
     }
@@ -1198,7 +1214,7 @@ function _get_host_settings(host, options, cached = true) {
  * @param {http.ServerResponse} res
  * @param {()void} callback
  */
-function _static_file(filename, res, fn_not_found, subdomain) {
+function _static_file(filename, res, fn_not_found) {
 
     var server = this;
 
@@ -1208,7 +1224,7 @@ function _static_file(filename, res, fn_not_found, subdomain) {
 
             if (!stats.size) {
 
-                return _static_file.call(server, filename + '/' + server.options.directory_index, res, fn_not_found, subdomain);
+                return _static_file.call(server, filename + '/' + server.options.directory_index, res, fn_not_found);
             }
 
             var url = res.req.url;
@@ -1228,35 +1244,52 @@ function _static_file(filename, res, fn_not_found, subdomain) {
             headers["Last-Modified"] = stats.mtime.toUTCString();
             headers["ETag"] = '"' + stats.size + "-" + Date.parse(stats.mtime) + '"';
 
+            if (res.req.headers['if-none-match'] === headers["ETag"]) {
+
+                statusCode = 304; // Not Modified
+                headers["Content-Length"] = 0;
+                res.writeHead(statusCode, headers);
+                res.end();
+
+                return;
+            }
             if (res.req.method.toLocaleUpperCase() === "HEAD") {
 
                 res.writeHead(statusCode, headers);
                 res.end();
+
+                return;
             }
-            else if (stats.size > 128 && /\bgzip\b/.test(acceptEncoding)) {
+            if (stats.size > 128 && /\bgzip\b/.test(acceptEncoding)) {
 
                 headers["Content-Encoding"] = "gzip";
                 res.writeHead(statusCode, headers);
                 pipeline(raw, zlib.createGzip(), res, onError);
+
+                return;
             }
-            else if (stats.size > 128 && /\bdeflate\b/.test(acceptEncoding)) {
+            if (stats.size > 128 && /\bdeflate\b/.test(acceptEncoding)) {
 
                 headers["Content-Encoding"] = "deflate";
                 res.writeHead(statusCode, headers);
                 pipeline(raw, zlib.createDeflate(), res, onError);
+
+                return;
             }
-            else if (stats.size > 128 && /\bbr\b/.test(acceptEncoding)) {
+            if (stats.size > 128 && /\bbr\b/.test(acceptEncoding)) {
 
                 headers["Content-Encoding"] = "br";
                 res.writeHead(statusCode, headers);
                 pipeline(raw, zlib.createBrotliCompress(), res, onError);
-            }
-            else {
 
-                headers["Content-Length"] = stats.size;
-                res.writeHead(statusCode, headers);
-                pipeline(raw, res, onError);
+                return;
             }
+
+            headers["Content-Length"] = stats.size;
+            res.writeHead(statusCode, headers);
+            pipeline(raw, res, onError);
+
+            return;
         }
         else if (typeof fn_not_found === "function") { fn_not_found(); }
     });
@@ -1537,85 +1570,201 @@ function _resolvePath(pathToFile) {
 //*** Service Worker ***
 function _getServiceWorkerCode(settings) {
     return `
-var RUNTIME = 'runtime@${settings.service_worker_version}';
-var PRECACHE = 'precache@${settings.service_worker_version}';
-var PRECACHE_URLS = ${_getCachingFilesToString(settings.precache_urls, settings.document_root)};
-
+var VERSION = '${settings.service_worker_version}',
+	RUNTIME = 'runtime',
+	PRECACHE = 'precache',
+	PRECACHE_URLS = ${_getCachingFilesToString(settings.precache_urls, settings.document_root)};
+    
 self.addEventListener('install', (event) => {
+
 	event.waitUntil(
-		caches.open(PRECACHE)
-			.then(function (cache) {
-				PRECACHE_URLS.forEach(function (url) {
-					return get_content(cache, url, null, true);
+		caches.open(PRECACHE).then(function (cache) {
+
+			cache.keys().then(function (requests) {
+
+				requests.forEach(function (request) {
+
+					if (!PRECACHE_URLS.includes(new URL(request.url).pathname)) {
+
+						cache.delete(request);
+					}
 				});
-			})${settings.is_new_service_worker_reload_browser ? '.then(self.skipWaiting())' : ''}
-	);
-});
-self.addEventListener('activate', event => {
-	var currentCaches = [PRECACHE, RUNTIME];
-	event.waitUntil(
-		caches.keys().then(cacheNames => {
-			return cacheNames.filter(cacheName => !currentCaches.includes(cacheName));
-		}).then(cachesToDelete => {
-			return Promise.all(cachesToDelete.map(cacheToDelete => {
-				return caches.delete(cacheToDelete);
-			}));
-		}).then(() => self.clients.claim())
-	);
-});
-self.addEventListener('fetch', function (event) {
-    var url = new URL(event.request.url, self.location.origin);
-    if (url.origin === self.location.origin) {
-        if (url.pathname === '/') { url.pathname += 'index.html' }
-        event.respondWith((async () => {
-            var precacheCache = await caches.open(PRECACHE);
-            var precacheResponse = await precacheCache.match(url);
-            if (precacheResponse) return precacheResponse;
-            var runtimeCache = await caches.open(RUNTIME);
-            var runtimeCacheResponse = await runtimeCache.match(url);
-            if (navigator.onLine && (event.request.url.includes('?') || /[:]/.test(url.pathname))) {
-                return fetch(new Request(url + '', { cache: 'no-cache' })).then(response => {
-                    if (response.status === 200 && response.redirected) {
-                        return fetch(new Request(response.redirected + '', { cache: 'no-cache' })).then(response => {
-                            return response;
+
+				var pendingPrecacheCount = PRECACHE_URLS.length;
+
+				PRECACHE_URLS.forEach(function (url) {
+
+					get_content(cache, url, null, true)
+						.then(checkComplete)
+						.catch(function (err) {
+							console.warn("Error precaching", url, err);
+							checkComplete();
                         });
-                    }
-                    return response;
-                });
-            }
-            if (runtimeCacheResponse && runtimeCacheResponse.status === 200 && !runtimeCacheResponse.redirected) {
-                return runtimeCacheResponse;
-            }
-            return get_content(runtimeCache, url + '', runtimeCacheResponse?.redirected && runtimeCacheResponse.url);
-        })());
-    }
+				});
+
+				function checkComplete() {
+
+					pendingPrecacheCount--;
+
+					if (pendingPrecacheCount <= 0) {
+
+						postMessage({ type: 'PRECACHE_COMPLETE', version: VERSION });
+						self.skipWaiting();
+					}
+                }
+			});
+		})
+	);
 });
+${settings.is_new_service_worker_reload_browser ? '\nself.addEventListener("activate", event => { \nself.clients.claim(); \n});\n' : ""}
+self.addEventListener('fetch', function (event) {
+
+	var url = new URL(event.request.url, self.location.origin);
+
+	if (url.origin === self.location.origin) {
+
+		if (url.pathname === '/') { url.pathname += 'index.html' }
+
+		event.respondWith(
+			caches.open(PRECACHE).then(function (precacheCache) {
+
+				return precacheCache.match(url).then(function (response) {
+
+					if (response) { return response; }
+
+					return caches.open(RUNTIME).then(function (runtimeCache) {
+
+						return runtimeCache.match(url).then(function (response) {
+
+							if (navigator.onLine && (event.request.url.includes('?') || /[:]/.test(url.pathname))) {
+
+								return fetch(new Request(url + '', { cache: 'no-cache' })).then(response => {
+
+									if (response.status === 200 && response.redirected) {
+
+										return fetch(new Request(response.redirected + '', { cache: 'no-cache' })).then(response => {
+
+											return response;
+										});
+									}
+									return response;
+								});
+							}
+
+
+							if (response && response.status === 200 && !response.redirected) {
+
+								return response;
+							}
+
+							return get_content(runtimeCache, url + '', response?.redirected && response.url)
+								.then(function (response) {
+
+									return response;
+								});
+						});
+					});
+				});
+			})
+		);
+	}
+});
+
 function get_content(cache, url, redirectUrl, isPRECACHE) {
 
-	var _url = redirectUrl || url;
+	return new Promise(function (resolve, reject) {
 
-	return fetch(new Request(_url, { cache: 'no-cache' })).then(response => {
-		if (response.status === 200 && response.redirected) {
-			return get_content(cache, url, response.url);
-		}
-		else if (response.status === 200 && !response.redirected) {
-			if (!isPRECACHE && response.headers.get("Cache-Control") === "no-cache") {
-				return response;
-			}
-			return cache.put(url, response.clone()).then(() => {
-				return response;
-			});
-		}
-		else {
-			console.warn("Not found resource in", _url);
-			return fetch(new Request(url, { cache: 'no-cache' })).then(response => {
-				if (response.status !== 200 || response.redirected) { return response; }
-				return cache.put(url, response.clone()).then(() => {
-					return response;
-				});
-			});
-		}
+		var requestUrl = redirectUrl || url;
+
+		return cache.match(requestUrl).then(function (cacheResponse) {
+
+			var etag = cacheResponse?.headers ? cacheResponse.headers.get('ETag') : null,
+				headers = new Headers({ 'Cache-Control': 'no-cache' });
+
+			if (etag) { headers.set('If-None-Match', etag); }
+
+			return fetch(new Request(requestUrl, { cache: 'no-cache', headers: headers })).then(function (response) {
+
+				if (response.status === 304) {
+
+					return resolve(cacheResponse || response);
+				}
+
+				if (response.status === 200 && response.redirected) {
+
+                    return get_content(cache, requestUrl, response.url).then(resolve).catch(reject);
+				}
+
+				if (response.status === 200 && !response.redirected) {
+
+					if (!isPRECACHE && response.headers.get("Cache-Control") === "no-cache") {
+
+                        return resolve(response);
+					}
+
+					if (isPRECACHE) {
+
+						postMessage({ type: 'NEW_CONTENT', url: response.url, version: VERSION });
+					}
+
+					cache.put(response.url, response.clone())
+						//.then(function () {
+						//
+						//	console.log("Caching", requestUrl, response.status, response.statusText);
+						//})
+						.catch(function (err) {
+
+							console.warn("Error caching", requestUrl, err);
+						});
+
+					return resolve(response);
+				}
+
+				console.warn("Not found resource in", requestUrl);
+
+				if (requestUrl === url) {
+
+					return resolve(new Response(null, { status: 404, statusText: 'Not Found' }));
+				}
+
+				return fetch(new Request(url, { cache: 'no-cache' })).then(function (response) {
+
+					if (response.status !== 200 || response.redirected) { return resolve(response); }
+
+					if (isPRECACHE) {
+
+						postMessage({ type: 'NEW_CONTENT', url: response.url, version: VERSION });
+					}
+
+					cache.put(response.url, response.clone())
+						//.then(function () {
+						//
+						//	console.log("Caching", requestUrl, response.status, response.statusText);
+						//})
+						.catch(function (err) {
+
+							console.warn("Error caching", response.url, err);
+						});
+
+					return resolve(response);
+
+                }).catch(reject);
+
+			}).catch(reject);
+		}).catch(reject);
 	});
+}
+
+function postMessage(msg) {
+
+    self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
+		.then(function (clientList) {
+
+			clientList.forEach(function (client) {
+
+				client.postMessage(msg);
+			});
+		});
 }
     `;
 }
@@ -1642,6 +1791,7 @@ function _getFiles(fsPath) {
 
     return fs.readdirSync(fsPath).reduce(function (filesPath, name) {
         if (name.startsWith('.')) { return filesPath; }
+        if (['robots.txt','sitemap.xml'].includes(name)) { return filesPath; }
         //if (options.pathToError_404.includes(name)) { return filesPath; }
         return filesPath.concat(_getFiles(`${fsPath}/${name}`));
     }, []);
