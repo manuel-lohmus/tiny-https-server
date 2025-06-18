@@ -5,7 +5,7 @@ if ('serviceWorker' in navigator) {
     var script = this.document && Array.from(document.scripts).find(function (s) { return s.src.includes('tiny-https-server'); }),
         isDebug = Boolean(script?.attributes.debug) || false,
         updateInterval = parseInt(script?.attributes?.updateInterval?.value) || 300000, // default 5min.
-        disableUpdateDialogs = Boolean(script?.attributes.disableUpdateConfirmDialogs) || false,
+        disableUpdateDialogs = Boolean(script?.attributes.disableUpdateDialogs) || false,
         dataUrl = script?.attributes?.dataUrl?.value || '';
 
     if (updateInterval < 10000) { updateInterval = 10000; }
@@ -67,21 +67,37 @@ function checkForServiceWorkerUpdate() {
     navigator.serviceWorker.ready
         .then(registration => {
 
-            registration.update().then(function () {
+            registration.update()
+                .then(function () {
 
-                if (updateInterval > -1) {
+                    if (updateInterval > -1) {
 
-                    setTimeout(checkForServiceWorkerUpdate, updateInterval);
-                }
-            });
+                        setTimeout(checkForServiceWorkerUpdate, updateInterval);
+                    }
+                })
+                .catch(function (error) {
+                    pError('Service Worker update failed:', error);
+                    requestReload();
+                });
         });
 }
 function requestReload() {
+
+    if (onmessage.newInstall) {
+
+        delete onmessage.newInstall;
+        delete onmessage.reload;
+
+        return;
+    }
+
+    window.dispatchEvent(new CustomEvent('tinyHttpsServe', { detail: { type: 'REQUEST_RELOAD' } }));
 
     if (!disableUpdateDialogs) {
 
         if (confirm('New content available.\nAre we upgrading now?')) {
 
+            delete onmessage.reload;
             location.reload();
         }
         else {
@@ -94,20 +110,23 @@ function onmessage(event) {
 
     pDebug('Message received from Service Worker:', event.data);
 
-    window.dispatchEvent(new CustomEvent('tiny-https-server', { detail: event.data }));
+    window.dispatchEvent(new CustomEvent('tinyHttpsServe', { detail: event.data }));
 
-    if (window.datacontext) {
+    var { type, url, version, error } = event.data;
 
-        if (!window.datacontext.serviceWorker) { window.datacontext.serviceWorker = {}; }
-        window.datacontext.serviceWorker.state = event.target.state;
-        window.datacontext.serviceWorker.message = event.data;
+
+    if (type === "PRECACHE_EMPTY") {
+
+        onmessage.newInstall = true;
     }
 
-    var { type, url, version } = event.data;
+    if (type === "PRECACHE_NEW_CONTENT") {
 
-    if (type === "NEW_CONTENT") {
-
-        if (url.endsWith('.html')) {
+        if (url === '/index.html'
+            || url.endsWith('.js')
+            || url.endsWith('.css')
+            || url.startsWith('/node_modules/')
+            || url.endsWith('.html') && findTemplateElement(url)) {
 
             onmessage.reload = true;
         }
@@ -118,17 +137,37 @@ function onmessage(event) {
         }
     }
 
+    if (type === "PRECACHE_ERROR") {
+
+        pError('Precache error for URL:', url, 'Version:', version, 'Error:', error);
+
+        if (confirm('Precache error occurred.\nDo you want to reload the page?')) {
+
+            location.reload();
+        }
+    }
+
     if (type === "PRECACHE_COMPLETE") {
 
         pDebug('Precache complete for version:', version);
 
         if (onmessage.reload) {
 
-            delete onmessage.reload;
             requestReload();
         }
     }
-}
+} function findTemplateElement(url) {
+
+    var elems = document.querySelectorAll('[template]'),
+        elem = elems ? Array.from(elems).find(function (el) { return url.includes(el.attributes.template.value); }) : null;
+
+    if (elem) { return elem }
+
+    elems = document.querySelectorAll('[templates]');
+    elem = elems ? Array.from(elems).find(function (el) { return url.includes(el.attributes.templates.value); }) : null;
+
+    return elem;
+} 
 
 // Debugging
 function pDebug(...args) { if (isDebug) { console.log(`[ DEBUG ] `, ...args); } }

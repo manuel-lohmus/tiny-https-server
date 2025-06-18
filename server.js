@@ -838,7 +838,7 @@ function _log(req, res) {
 
     var ip = req.client.remoteAddress || 'unknown';
     var port = req.client.remotePort || 'unknown';
-    var msg = blacklist[ip] ? blacklist[ip].status : "";
+    var msg = blacklist[ip]?.status ? blacklist[ip].status : "";
     while (msg.length < 9) { msg += ' '; }
     // client address and port
     msg += ip + ":" + port + " "; //255.255.255.255:65535
@@ -983,7 +983,10 @@ self.addEventListener('install', (event) => {
         //*** Service Worker Strict ***
         if ((!settings.host || this.options.subdomains[settings.host])) {
 
-            return response(_getServiceWorkerCode(settings), settings);
+            return _getAsyncServiceWorkerCode(settings, function (strCode) {
+
+                response(strCode, settings);
+            });
         }
     }
 
@@ -1032,27 +1035,20 @@ function _node_modules_request(req, res, next) {
     if (req.url.startsWith("/node_modules") && req.method.toLocaleUpperCase() === "GET") {
 
         var server = this,
-            modulePaths = req.url.split('?').shift().split("/").filter(function (v) { return v; }),
-            [moduleName, moduleVersion] = modulePaths[1].split("@"),
-            packagePath = path.join(process.cwd(), "node_modules", moduleName, "package.json"),
-            packageInfo = null;
+            modulePath = _resolve_node_modules_path(req.url);
 
-        modulePaths[1] = moduleName;
-
-        if (fs.existsSync(packagePath)) { packageInfo = require(packagePath); }
-        if (modulePaths.length === 2 && packageInfo) { modulePaths.push(packageInfo.browser || packageInfo.main); }
-
-        if (moduleVersion && packageInfo?.version && !packageInfo.version.startsWith(moduleVersion)) {
+        if (!modulePath) {
 
             _not_found_content.call(server, req, res);
 
             return;
         }
 
-        _static_file.call(server, path.join(process.cwd(), ...modulePaths), res, function () {
+        _static_file.call(server, modulePath, res, function () {
 
             // /node_modules/tiny-https-server/
-            if (moduleName === "tiny-https-server" && modulePaths.length === 2) {
+            if (req.url.startsWith('/node_modules/tiny-https-server')) {
+            //if (moduleName === "tiny-https-server" && modulePaths.length === 2) {
 
                 _static_file.call(server, path.join(process.cwd(), "browser.js"), res, function () {
 
@@ -1069,6 +1065,25 @@ function _node_modules_request(req, res, next) {
     }
 
     next();
+}
+function _resolve_node_modules_path(pathName) {
+
+    var modulePaths = pathName.split('?').shift().split("/").filter(function (v) { return v; }),
+        [moduleName, moduleVersion] = modulePaths[1].split("@"),
+        packagePath = path.join(process.cwd(), "node_modules", moduleName, "package.json"),
+        packageInfo = null;
+
+    modulePaths[1] = moduleName;
+
+    if (fs.existsSync(packagePath)) { packageInfo = require(packagePath); }
+    if (modulePaths.length === 2 && packageInfo) { modulePaths.push(packageInfo.browser || packageInfo.main); }
+
+    if (moduleVersion && packageInfo?.version && !packageInfo.version.startsWith(moduleVersion)) {
+
+        return '';
+    }
+
+    return path.join(process.cwd(), ...modulePaths);
 }
 /**
  * @param {http.IncomingMessage} req
@@ -1228,7 +1243,7 @@ function _static_file(filename, res, fn_not_found) {
             }
 
             var url = res.req.url;
-            var statusCode = 200;
+            var statusCode = res.statusCode || 200;
             var acceptEncoding = res.req.headers['accept-encoding'] || "";
             var cache_control = server.options.cache_control.fileTypes[path.extname(filename).substring(1)];
             var raw = fs.createReadStream(filename);
@@ -1567,224 +1582,6 @@ function _resolvePath(pathToFile) {
 
     return pathToFile;
 }
-//*** Service Worker ***
-function _getServiceWorkerCode(settings) {
-    return `
-var VERSION = '${settings.service_worker_version}',
-	RUNTIME = 'runtime',
-	PRECACHE = 'precache',
-	PRECACHE_URLS = ${_getCachingFilesToString(settings.precache_urls, settings.document_root)};
-    
-self.addEventListener('install', (event) => {
-
-	event.waitUntil(
-		caches.open(PRECACHE).then(function (cache) {
-
-			cache.keys().then(function (requests) {
-
-				requests.forEach(function (request) {
-
-					if (!PRECACHE_URLS.includes(new URL(request.url).pathname)) {
-
-						cache.delete(request);
-					}
-				});
-
-				var pendingPrecacheCount = PRECACHE_URLS.length;
-
-				PRECACHE_URLS.forEach(function (url) {
-
-					get_content(cache, url, null, true)
-						.then(checkComplete)
-						.catch(function (err) {
-							console.warn("Error precaching", url, err);
-							checkComplete();
-                        });
-				});
-
-				function checkComplete() {
-
-					pendingPrecacheCount--;
-
-					if (pendingPrecacheCount <= 0) {
-
-						postMessage({ type: 'PRECACHE_COMPLETE', version: VERSION });
-						self.skipWaiting();
-					}
-                }
-			});
-		})
-	);
-});
-${settings.is_new_service_worker_reload_browser ? '\nself.addEventListener("activate", event => { \nself.clients.claim(); \n});\n' : ""}
-self.addEventListener('fetch', function (event) {
-
-	var url = new URL(event.request.url, self.location.origin);
-
-	if (url.origin === self.location.origin) {
-
-		if (url.pathname === '/') { url.pathname += 'index.html' }
-
-		event.respondWith(
-			caches.open(PRECACHE).then(function (precacheCache) {
-
-				return precacheCache.match(url).then(function (response) {
-
-					if (response) { return response; }
-
-					return caches.open(RUNTIME).then(function (runtimeCache) {
-
-						return runtimeCache.match(url).then(function (response) {
-
-							if (navigator.onLine && (event.request.url.includes('?') || /[:]/.test(url.pathname))) {
-
-								return fetch(new Request(url + '', { cache: 'no-cache' })).then(response => {
-
-									if (response.status === 200 && response.redirected) {
-
-										return fetch(new Request(response.redirected + '', { cache: 'no-cache' })).then(response => {
-
-											return response;
-										});
-									}
-									return response;
-								});
-							}
-
-
-							if (response && response.status === 200 && !response.redirected) {
-
-								return response;
-							}
-
-							return get_content(runtimeCache, url + '', response?.redirected && response.url)
-								.then(function (response) {
-
-									return response;
-								});
-						});
-					});
-				});
-			})
-		);
-	}
-});
-
-function get_content(cache, url, redirectUrl, isPRECACHE) {
-
-	return new Promise(function (resolve, reject) {
-
-		var requestUrl = redirectUrl || url;
-
-		return cache.match(requestUrl).then(function (cacheResponse) {
-
-			var etag = cacheResponse?.headers ? cacheResponse.headers.get('ETag') : null,
-				headers = new Headers({ 'Cache-Control': 'no-cache' });
-
-			if (etag) { headers.set('If-None-Match', etag); }
-
-			return fetch(new Request(requestUrl, { cache: 'no-cache', headers: headers })).then(function (response) {
-
-				if (response.status === 304) {
-
-					return resolve(cacheResponse || response);
-				}
-
-				if (response.status === 200 && response.redirected) {
-
-                    return get_content(cache, requestUrl, response.url).then(resolve).catch(reject);
-				}
-
-				if (response.status === 200 && !response.redirected) {
-
-					if (!isPRECACHE && response.headers.get("Cache-Control") === "no-cache") {
-
-                        return resolve(response);
-					}
-
-					if (isPRECACHE) {
-
-						postMessage({ type: 'NEW_CONTENT', url: response.url, version: VERSION });
-					}
-
-					cache.put(response.url, response.clone())
-						//.then(function () {
-						//
-						//	console.log("Caching", requestUrl, response.status, response.statusText);
-						//})
-						.catch(function (err) {
-
-							console.warn("Error caching", requestUrl, err);
-						});
-
-					return resolve(response);
-				}
-
-				console.warn("Not found resource in", requestUrl);
-
-				if (requestUrl === url) {
-
-					return resolve(new Response(null, { status: 404, statusText: 'Not Found' }));
-				}
-
-				return fetch(new Request(url, { cache: 'no-cache' })).then(function (response) {
-
-					if (response.status !== 200 || response.redirected) { return resolve(response); }
-
-					if (isPRECACHE) {
-
-						postMessage({ type: 'NEW_CONTENT', url: response.url, version: VERSION });
-					}
-
-					cache.put(response.url, response.clone())
-						//.then(function () {
-						//
-						//	console.log("Caching", requestUrl, response.status, response.statusText);
-						//})
-						.catch(function (err) {
-
-							console.warn("Error caching", response.url, err);
-						});
-
-					return resolve(response);
-
-                }).catch(reject);
-
-			}).catch(reject);
-		}).catch(reject);
-	});
-}
-
-function postMessage(msg) {
-
-    self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
-		.then(function (clientList) {
-
-			clientList.forEach(function (client) {
-
-				client.postMessage(msg);
-			});
-		});
-}
-    `;
-}
-function _getCachingFilesToString(precache_urls, document_root) {
-
-    if (precache_urls === null) { return '[]'; }
-
-    if (!Array.isArray(precache_urls)) { precache_urls = []; }
-
-    precache_urls = precache_urls.concat(_getFiles(document_root));
-
-    return `[${precache_urls
-        .map(function (fsPath) {
-            return '\r\n\t"'
-                + fsPath.replace(document_root, '')
-                + '"';
-        })
-        .join(',')}
-]`;
-}
 function _getFiles(fsPath) {
 
     if (!fs.lstatSync(fsPath).isDirectory()) { return [fsPath]; }
@@ -1796,6 +1593,429 @@ function _getFiles(fsPath) {
         return filesPath.concat(_getFiles(`${fsPath}/${name}`));
     }, []);
 
+}
+//*** Service Worker ***
+function _getAsyncServiceWorkerCode(settings, callback) {
+
+    var service_worker_version = settings.service_worker_version;
+
+    _getAsyncCachingFilesToString(settings.precache_urls, settings.document_root, function (str_url_list) {
+
+        callback(`
+var VERSION = '${service_worker_version}',
+	RUNTIME = 'runtime',
+	PRECACHE = 'precache',
+	PRECACHE_URLS = [${str_url_list}
+    ];
+
+// Install event: cache files
+self.addEventListener('install', function (event) {
+
+    event.waitUntil(
+        caches.open(PRECACHE).then(function (cache) {
+
+            var i = -1;
+
+            cache.keys()
+                .then(function (keys) {
+
+                    if (!keys.length) {
+
+                        postMessage({ type: 'PRECACHE_EMPTY', version: VERSION });
+                    }
+
+                    next();
+                });
+
+            function next() {
+
+                i++;
+
+                if (i >= PRECACHE_URLS.length) {
+
+                    postMessage({ type: 'PRECACHE_COMPLETE', version: VERSION });
+                    self.skipWaiting();
+
+                    return;
+                }
+
+                var etag_url = PRECACHE_URLS[i],
+                    index = etag_url.indexOf('" '),
+                    newEtag = etag_url.substring(0, index + 1),
+                    url = etag_url.substring(index + 2);
+
+                cache.match(url)
+                    .then(function (request) {
+
+                        if (request) {
+
+                            var oldEtag = request.headers.get('ETag');
+
+                            if (newEtag !== oldEtag) {
+
+                                cache.delete(request)
+                                    .then(function () {
+
+                                        cache.add(url).then(function () {
+
+                                            postMessage({ type: 'PRECACHE_NEW_CONTENT', url, version: VERSION });
+                                            next();
+                                        });
+                                    });
+                            }
+
+                            else { next(); }
+                        }
+
+                        else {
+
+                            cache.add(url).then(function () {
+
+                                postMessage({ type: 'PRECACHE_NEW_CONTENT', url, version: VERSION });
+                                next();
+                            });
+                        }
+                    })
+                    .catch(function () {
+
+                        console.warn("Error precaching", url, err);
+                        postMessage({ type: 'PRECACHE_ERROR', url, version: VERSION, error: err.message });
+                    });
+            }
+        })
+    );
+});
+
+// Activate event: clean up old caches
+self.addEventListener('activate', function (event) {
+
+    event.waitUntil(
+        caches.open(PRECACHE).then(function (cache) {
+
+            cache.keys().then(function (requests) {
+
+                var i = -1;
+                next();
+
+                function next() {
+
+                    i++;
+
+                    if (i >= requests.length) { return removeNonPrecacheCaches(); }
+
+                    var pathname = new URL(requests[i].url).pathname,
+                        etag_url = PRECACHE_URLS.find(function (etag_url) {
+
+                            var url = etag_url.substring(etag_url.indexOf('" ') + 2);
+
+                            return url === pathname;
+                        });
+
+                    if (!etag_url) {
+
+                        cache.delete(requests[i]).then(next);
+                    }
+
+                    else { next(); }
+                }
+                function removeNonPrecacheCaches() {
+
+                    caches.keys()
+                        .then(function (cacheNames) {
+                            return Promise.all(
+                                cacheNames.map(function (cacheName) {
+
+                                    if (cacheName !== PRECACHE) {
+
+                                        caches.delete(cacheName);
+                                    }
+                                }));
+                        })
+                        .then(function () {
+
+                            clients.claim();
+                        });
+                }
+            });
+        })
+    );
+});
+
+// Fetch event: serve cached content when offline
+self.addEventListener('fetch', event => {
+
+
+    var url = new URL(event.request.url, self.location.origin);
+
+    if (url.origin === self.location.origin) {
+
+        if (url.pathname === '/') { url.pathname += 'index.html' }
+
+        event.respondWith(caches.open(PRECACHE).
+            then(function (precacheCache) {
+
+                return precacheCache.match(url)
+                    .then(function (response) {
+
+                        if (response) { return response; }
+
+                        return caches.open(RUNTIME)
+                            .then(function (runtimeCache) {
+
+                                return runtimeCache.match(url)
+                                    .then(function (response) {
+
+                                        if (navigator.onLine && (event.request.url.includes('?') || /[:]/.test(url.pathname))) {
+
+                                            return fetch(new Request(url + '', { cache: 'no-cache' })).then(response => {
+
+                                                if (response.status === 200 && response.redirected) {
+
+                                                    return fetch(new Request(response.redirected + '', { cache: 'no-cache' })).then(response => {
+
+                                                        return response;
+                                                    });
+                                                }
+                                                return response;
+                                            });
+                                        }
+
+                                        if (response && response.status === 200 && !response.redirected) {
+
+                                            return response;
+                                        }
+
+                                        return get_content(runtimeCache, response, url)
+                                            .then(function (response) {
+
+                                                return response;
+                                            });
+                                });
+                            });
+                    });
+            })
+            .catch(function (err) {
+
+                console.error("Service Worker fetching Error:", err);
+            })
+        );
+    }
+});
+
+function get_content(cache, previousResponse, url) {
+
+    var requestUrl = previousResponse?.redirected && previousResponse.url || (url + ''),
+        etag = previousResponse?.headers ? previousResponse.headers.get('ETag') : null,
+        headers = new Headers({});
+
+    if (etag) { headers.set('If-None-Match', etag); }
+
+    return fetch(new Request(requestUrl, { cache: 'no-cache', headers: headers }))
+        .then(function (response) {
+
+            if (response.status === 304) {
+
+                return previousResponse || response;
+            }
+
+            if (response.status === 200 && response.redirected) {
+
+                return get_content(cache, response, requestUrl);
+            }
+
+            if (response.status === 200 && !response.redirected) {
+
+                if (response.headers.get("Cache-Control") === "no-cache") {
+
+                    return response;
+                }
+
+                return cache.put(response.url, response)
+                    .then(function () {
+
+                        return response;
+                    });
+            }
+
+            console.warn("Not found resource in", requestUrl);
+
+            if (requestUrl === url) {
+
+                return new Response(null, { status: 404, statusText: 'Not Found' });
+            }
+
+            return fetch(new Request(url)).then(function (response) {
+
+                if (response.status !== 200 || response.redirected) { return response; }
+
+                return cache.put(response.url, response)
+                    .then(function () {
+
+                        return resolve(response);
+                    });
+
+            })
+        });
+}
+
+function postMessage(msg) {
+
+    self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
+        .then(function (clientList) {
+
+            clientList.forEach(function (client) {
+
+                client.postMessage(msg);
+            });
+        });
+}
+        `);
+    });
+
+
+    /**
+     * Get async caching files to string for precache_urls
+     * @param {Array} precache_urls - Array of URLs to be cached
+     * @param {string} document_root - Document root path
+     * @param {function} callback - Callback function to return the result. Array of ETag-URL pairs in JSON format.
+     * @return {void}
+     */
+    function _getAsyncCachingFilesToString(precache_urls, document_root, callback) {
+
+        if (precache_urls === null) { return callback('[]'); }
+
+        if (!Array.isArray(precache_urls)) { precache_urls = []; }
+
+        var filePromises = precache_urls.map(function (fileKey) {
+
+            return new Promise(function (resolve) {
+
+                if (fileKey.startsWith('/node_modules/')) {
+
+                    _getAsyncFiles(fileKey, _resolve_node_modules_path(fileKey), resolve);
+                }
+                else {
+
+                    _getAsyncFiles(fileKey, path.join(document_root, fileKey), resolve);
+                }
+            });
+        });
+
+        Promise.all(filePromises)
+            .then(function (results) {
+
+                precache_urls = results.flat().filter(Boolean);
+
+                // Get files from document root
+                _getAsyncFiles('', document_root, function (files) {
+
+                    precache_urls = precache_urls.concat(files);
+
+                    // Sort files by "/index.html", starting with "/node_modules/", extension ".js", ".css", ".html" and then by path.
+                    precache_urls.sort(function (a, b) {
+
+                        a = a.substring(a.indexOf('" ') + 2);
+                        b = b.substring(b.indexOf('" ') + 2);
+
+                        if (a === "/index.html'") { return -1; }
+                        if (b === "/index.html'") { return 1; }
+                        if (a.startsWith("/node_modules/") && !b.startsWith("/node_modules/")) { return -1; }
+                        if (!a.startsWith("/node_modules/") && b.startsWith("/node_modules/")) { return 1; }
+                        if (a.endsWith(".js'") && !b.endsWith(".js'")) { return -1; }
+                        if (!a.endsWith(".js'") && b.endsWith(".js'")) { return 1; }
+                        if (a.endsWith(".css'") && !b.endsWith(".css'")) { return -1; }
+                        if (!a.endsWith(".css'") && b.endsWith(".css'")) { return 1; }
+                        if (a.endsWith(".html'") && !b.endsWith(".html'")) { return -1; }
+                        if (!a.endsWith(".html'") && b.endsWith(".html'")) { return 1; }
+
+                        return a.localeCompare(b);
+                    });
+
+                    // Remove duplicates
+                    precache_urls = precache_urls.filter(function (item, pos, arr) {
+
+                        return arr.indexOf(item) === pos;
+                    });
+
+                    callback(precache_urls.join(','));
+                });
+            })
+            .catch(function (err) {
+
+                pError("Error reading files:", err);
+                callback([]);
+            });
+
+
+        /**
+         * Recursively get files from the file system
+         * @param {string} fsPath - The file system path to start from
+         * @param {function} callback - Callback function to return the result. Array of [ETag, URL] pairs in JSON format.
+         * @return {void}
+         * @private
+         *  
+         * @description This function reads the file system starting from the given path and returns an array of files with their ETag and last modified time in the format: '"size-timestamp" fsPath'.
+         * It handles both files and directories, recursively reading directories to gather all files. If an error occurs while reading the file system, it logs the error and returns an empty array.
+         */
+        function _getAsyncFiles(pathKey, fsPath, callback = function () { }) {
+
+            fs.stat(fsPath, function (err, stats) {
+
+                if (err) {
+
+                    pError("Error reading file system:", err);
+
+                    return callback([]);
+                }
+
+                if (stats.isFile()) {
+
+                    return callback([`\r\n\t'"${stats.size}-${Date.parse(stats.mtime)}" ${pathKey}'`]);
+                }
+
+                if (stats.isDirectory()) {
+
+                    fs.readdir(fsPath, function (err, files) {
+
+                        if (err) {
+
+                            pError("Error reading directory:", err);
+
+                            return callback([]);
+                        }
+
+                        var filePromises = files
+                            .filter(function (file) {
+
+                                return !file.startsWith('.')
+                                    && !file.includes('robots.txt')
+                                    && !file.includes('sitemap.xml');
+                            })
+                            .map(function (file) {
+
+                                return new Promise(function (resolve) {
+
+                                    _getAsyncFiles(pathKey + '/' + file, path.join(fsPath, file), resolve);
+                                });
+                            });
+
+                        if (filePromises.length === 0) { return callback([]); }
+
+                        Promise.all(filePromises)
+                            .then(function (results) {
+
+                                callback(results.flat().filter(Boolean));
+                            })
+                            .catch(function (err) {
+
+                                pError("Error reading files:", err);
+                                callback([]);
+                            });
+                    });
+                }
+            });
+        }
+    }
 }
 
 // Debugging

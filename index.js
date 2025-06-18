@@ -10,6 +10,7 @@ var configSets = require("config-sets"),
     clusterOptions = configSets('web-cluster', {
         isDebug: false,
         parallelism: 'auto',
+        httpToHttpsRedirect: true
     });
 
 module.exports = WebCluster;
@@ -93,7 +94,7 @@ function WebCluster(
                 workersCount = 0;
 
             //create http to https
-            if (isSSL) { webCluster.serverHttpToHttps = createHttp(true); }
+            if (isSSL && clusterOptions.httpToHttpsRedirect) { webCluster.serverHttpToHttps = createHttp(true); }
 
             // parallelism is a valid number
             if (typeof parallelism === 'number' && (0 < parallelism && parallelism < max_parallelism)) {
