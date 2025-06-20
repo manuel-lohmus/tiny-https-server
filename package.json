@@ -1,6 +1,6 @@
 {
   "name": "tiny-https-server",
-  "version": "2.0.0-rc.3",
+  "version": "2.0.0-rc.4",
   "license": "MIT",
   "description": "Tiny web server with HTTPS support, static file serving, subdomain support, middleware support, and service worker support.",
   "keywords": [

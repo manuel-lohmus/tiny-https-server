@@ -17,6 +17,7 @@ var blacklistBlockingLimit = 100,
 
     hostnames = _getHostnames(),
     mimeTypes = require(path.join(__dirname, "mimeTypes.js")),
+    compressibleExtensions = ['.html', '.htm', '.css', '.js', '.mjs', '.json', '.xml', '.svg', '.txt', '.csv', '.tsv', '.md', '.eot', '.ttf', '.otf', '.woff'],
     events = {},
     requestArr = [_routerRequest, _node_modules_request, _static_request],
     routerRequestObj = {
@@ -1242,27 +1243,23 @@ function _static_file(filename, res, fn_not_found) {
                 return _static_file.call(server, filename + '/' + server.options.directory_index, res, fn_not_found);
             }
 
-            var url = res.req.url;
-            var statusCode = res.statusCode || 200;
-            var acceptEncoding = res.req.headers['accept-encoding'] || "";
-            var cache_control = server.options.cache_control.fileTypes[path.extname(filename).substring(1)];
-            var raw = fs.createReadStream(filename);
-            var headers = res.headers || {};
+            var extname = path.extname(filename),
+                statusCode = res.statusCode || 200,
+                acceptEncoding = res.req.headers['accept-encoding'] || "",
+                cache_control = server.options.cache_control.fileTypes[extname.substring(1)],
+                headers = res.headers || {};
 
 
-            if (acceptEncoding) { headers["Vary"] = "Accept-Encoding"; }
-            if (mimeTypes[path.extname(filename)]) { headers["Content-Type"] = mimeTypes[path.extname(filename)]; }
+            if (mimeTypes[extname]) { headers["Content-Type"] = mimeTypes[extname]; }
             if (cache_control && statusCode === 200) { headers["Cache-Control"] = cache_control; }
             else if (statusCode === 200) { headers["Cache-Control"] = "no-cache"; }
 
-            headers["Content-Length"] = stats.size;
             headers["Last-Modified"] = stats.mtime.toUTCString();
             headers["ETag"] = '"' + stats.size + "-" + Date.parse(stats.mtime) + '"';
 
             if (res.req.headers['if-none-match'] === headers["ETag"]) {
 
                 statusCode = 304; // Not Modified
-                headers["Content-Length"] = 0;
                 res.writeHead(statusCode, headers);
                 res.end();
 
@@ -1275,29 +1272,36 @@ function _static_file(filename, res, fn_not_found) {
 
                 return;
             }
-            if (stats.size > 128 && /\bgzip\b/.test(acceptEncoding)) {
 
-                headers["Content-Encoding"] = "gzip";
-                res.writeHead(statusCode, headers);
-                pipeline(raw, zlib.createGzip(), res, onError);
+            var raw = fs.createReadStream(filename);
 
-                return;
-            }
-            if (stats.size > 128 && /\bdeflate\b/.test(acceptEncoding)) {
+            if (acceptEncoding && compressibleExtensions.includes(extname)) {
 
-                headers["Content-Encoding"] = "deflate";
-                res.writeHead(statusCode, headers);
-                pipeline(raw, zlib.createDeflate(), res, onError);
+                if (acceptEncoding) { headers["Vary"] = "Accept-Encoding"; }
+                if (stats.size > 128 && /\bgzip\b/.test(acceptEncoding)) {
 
-                return;
-            }
-            if (stats.size > 128 && /\bbr\b/.test(acceptEncoding)) {
+                    headers["Content-Encoding"] = "gzip";
+                    res.writeHead(statusCode, headers);
+                    pipeline(raw, zlib.createGzip(), res, onError);
 
-                headers["Content-Encoding"] = "br";
-                res.writeHead(statusCode, headers);
-                pipeline(raw, zlib.createBrotliCompress(), res, onError);
+                    return;
+                }
+                if (stats.size > 128 && /\bdeflate\b/.test(acceptEncoding)) {
 
-                return;
+                    headers["Content-Encoding"] = "deflate";
+                    res.writeHead(statusCode, headers);
+                    pipeline(raw, zlib.createDeflate(), res, onError);
+
+                    return;
+                }
+                if (stats.size > 128 && /\bbr\b/.test(acceptEncoding)) {
+
+                    headers["Content-Encoding"] = "br";
+                    res.writeHead(statusCode, headers);
+                    pipeline(raw, zlib.createBrotliCompress(), res, onError);
+
+                    return;
+                }
             }
 
             headers["Content-Length"] = stats.size;
@@ -1612,77 +1616,127 @@ var VERSION = '${service_worker_version}',
 self.addEventListener('install', function (event) {
 
     event.waitUntil(
-        caches.open(PRECACHE).then(function (cache) {
+        caches.open(PRECACHE)
+            .then(function (cache) {
 
-            var i = -1;
+                var i = -1;
 
-            cache.keys()
-                .then(function (keys) {
+                return cache.keys()
+                    .then(function (keys) {
 
-                    if (!keys.length) {
+                        if (!keys.length) {
 
-                        postMessage({ type: 'PRECACHE_EMPTY', version: VERSION });
+                            postMessage({ type: 'PRECACHE_EMPTY', version: VERSION });
+                        }
+
+                        return next();
+                    });
+
+                function next() {
+
+                    i++;
+
+                    if (i >= PRECACHE_URLS.length) {
+
+                        postMessage({ type: 'PRECACHE_COMPLETE', version: VERSION });
+                        return cleanCache();
                     }
 
-                    next();
-                });
+                    var etag_url = PRECACHE_URLS[i],
+                        index = etag_url.indexOf('" '),
+                        newEtag = etag_url.substring(0, index + 1),
+                        url = etag_url.substring(index + 2);
 
-            function next() {
+                    return cache.match(url)
+                        .then(function (request) {
 
-                i++;
+                            if (request) {
 
-                if (i >= PRECACHE_URLS.length) {
+                                var oldEtag = request.headers.get('ETag');
 
-                    postMessage({ type: 'PRECACHE_COMPLETE', version: VERSION });
-                    self.skipWaiting();
+                                if (newEtag !== oldEtag) {
 
-                    return;
-                }
+                                    return cache.delete(request)
+                                        .then(function () {
 
-                var etag_url = PRECACHE_URLS[i],
-                    index = etag_url.indexOf('" '),
-                    newEtag = etag_url.substring(0, index + 1),
-                    url = etag_url.substring(index + 2);
+                                            return cache.add(url)
+                                                .then(function () {
 
-                cache.match(url)
-                    .then(function (request) {
-
-                        if (request) {
-
-                            var oldEtag = request.headers.get('ETag');
-
-                            if (newEtag !== oldEtag) {
-
-                                cache.delete(request)
-                                    .then(function () {
-
-                                        cache.add(url).then(function () {
-
-                                            postMessage({ type: 'PRECACHE_NEW_CONTENT', url, version: VERSION });
-                                            next();
+                                                    postMessage({ type: 'PRECACHE_NEW_CONTENT', url, version: VERSION });
+                                                    return next();
+                                                });
                                         });
-                                    });
+                                }
+
+                                else { return next(); }
                             }
 
-                            else { next(); }
-                        }
+                            else {
 
-                        else {
+                                return cache.add(url)
+                                    .then(function () {
 
-                            cache.add(url).then(function () {
+                                        postMessage({ type: 'PRECACHE_NEW_CONTENT', url, version: VERSION });
+                                        return next();
+                                    });
+                            }
+                        });
+                }
+                function cleanCache() {
 
-                                postMessage({ type: 'PRECACHE_NEW_CONTENT', url, version: VERSION });
-                                next();
-                            });
-                        }
-                    })
-                    .catch(function () {
+                    return cache.keys()
+                        .then(function (requests) {
 
-                        console.warn("Error precaching", url, err);
-                        postMessage({ type: 'PRECACHE_ERROR', url, version: VERSION, error: err.message });
-                    });
-            }
-        })
+                            var i = -1;
+                            return next();
+
+                            function next() {
+
+                                i++;
+
+                                if (i >= requests.length) { return removeNonPrecacheCaches(); }
+
+                                var pathname = new URL(requests[i].url).pathname,
+                                    etag_url = PRECACHE_URLS.find(function (etag_url) {
+
+                                        var url = etag_url.substring(etag_url.indexOf('" ') + 2);
+
+                                        return url === pathname;
+                                    });
+
+                                if (!etag_url) {
+
+                                    return cache.delete(requests[i]).then(next);
+                                }
+
+                                else { return next(); }
+                            }
+                            function removeNonPrecacheCaches() {
+
+                                return caches.keys()
+                                    .then(function (cacheNames) {
+
+                                        return Promise.all(
+                                            cacheNames.map(function (cacheName) {
+
+                                                if (cacheName !== PRECACHE) {
+
+                                                    caches.delete(cacheName);
+                                                }
+                                            }));
+                                    })
+                                    .then(function () {
+
+                                        return self.skipWaiting();
+                                    });
+                            }
+                        });
+                }
+            })
+            .catch(function (err) {
+
+                postMessage({ type: 'PRECACHE_ERROR', version: VERSION, error: err.message });
+            })
     );
 });
 
@@ -1690,54 +1744,7 @@ self.addEventListener('install', function (event) {
 self.addEventListener('activate', function (event) {
 
     event.waitUntil(
-        caches.open(PRECACHE).then(function (cache) {
-
-            cache.keys().then(function (requests) {
-
-                var i = -1;
-                next();
-
-                function next() {
-
-                    i++;
-
-                    if (i >= requests.length) { return removeNonPrecacheCaches(); }
-
-                    var pathname = new URL(requests[i].url).pathname,
-                        etag_url = PRECACHE_URLS.find(function (etag_url) {
-
-                            var url = etag_url.substring(etag_url.indexOf('" ') + 2);
-
-                            return url === pathname;
-                        });
-
-                    if (!etag_url) {
-
-                        cache.delete(requests[i]).then(next);
-                    }
-
-                    else { next(); }
-                }
-                function removeNonPrecacheCaches() {
-
-                    caches.keys()
-                        .then(function (cacheNames) {
-                            return Promise.all(
-                                cacheNames.map(function (cacheName) {
-
-                                    if (cacheName !== PRECACHE) {
-
-                                        caches.delete(cacheName);
-                                    }
-                                }));
-                        })
-                        .then(function () {
-
-                            clients.claim();
-                        });
-                }
-            });
-        })
+        clients.claim()
     );
 });
 
@@ -1851,7 +1858,7 @@ function get_content(cache, previousResponse, url) {
                 return cache.put(response.url, response)
                     .then(function () {
 
-                        return resolve(response);
+                        return response;
                     });
 
             })

@@ -140,11 +140,6 @@ function onmessage(event) {
     if (type === "PRECACHE_ERROR") {
 
         pError('Precache error for URL:', url, 'Version:', version, 'Error:', error);
-
-        if (confirm('Precache error occurred.\nDo you want to reload the page?')) {
-
-            location.reload();
-        }
     }
 
     if (type === "PRECACHE_COMPLETE") {
