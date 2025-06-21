@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ "master" ]
 
+permissions:
+  contents: read # to download the repository
+  id-token: write # to use OIDC for deployments
+
 jobs:
   test:
     runs-on: ${{ matrix.os }}
